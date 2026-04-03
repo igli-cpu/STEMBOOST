@@ -1,0 +1,6 @@
+Explicitly state the scope,
+Your project will capture three key players (Educator, Learner, Mentor),
+The Educator(s) will create content and upload to the system,
+The Mentor browses through the content and assigns the courses to the Learner,
+The Mentor and Learner can check the progress made (e.g. 7 out of 10 courses consumed), NOT progress report.,
+The learners will consume what has been assigned to them
