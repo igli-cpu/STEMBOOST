@@ -52,20 +52,47 @@ class LearnerView(tk.Frame):
         AccessibleButton(header, tts=self.tts, text="Settings",
                          command=self._show_settings).pack(side="right", padx=5)
 
-        # Notebook tabs
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill="both", expand=True, padx=10, pady=5)
+        # Navigation help banner
+        help_text = (
+            "Navigation: Press Tab to move between controls. "
+            "Press Enter to activate the selected item. "
+            "Use Arrow keys to browse lists. "
+            "Press Escape to close dialogs or return to login."
+        )
+        help_label = AccessibleLabel(
+            self, tts=self.tts, text=help_text,
+            wraplength=900, justify="left",
+            font=("Arial", 10, "italic"), fg="#555555")
+        help_label.pack(fill="x", padx=10, pady=(0, 5))
 
-        self._build_assignments_tab(notebook)
-        self._build_progress_tab(notebook)
-        self._build_careers_tab(notebook)
-        self._build_opportunities_tab(notebook)
+        # Notebook tabs
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill="both", expand=True, padx=10, pady=5)
+
+        self._build_assignments_tab(self.notebook)
+        self._build_progress_tab(self.notebook)
+        self._build_careers_tab(self.notebook)
+        self._build_opportunities_tab(self.notebook)
+
+        # Announce tab changes via TTS
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
 
         if self.tts:
             self.tts.speak(
                 f"Welcome, {self.user.name}. Your learner dashboard is ready. "
-                "Use the tabs to view your assignments, progress, STEM careers, "
-                "or opportunities.")
+                "Here is how to navigate: "
+                "Press Tab to move between controls and Shift Tab to go back. "
+                "Press Enter to activate the selected item. "
+                "Use the arrow keys to browse items in a list. "
+                "Press Escape to close a dialog or return to the login screen. "
+                "You have four tabs: My Assignments, My Progress, "
+                "STEM Careers, and Opportunities.")
+
+    def _on_tab_change(self, event):
+        """Announce the active tab via TTS when the user switches tabs."""
+        if self.tts:
+            tab_name = self.notebook.tab(self.notebook.select(), "text")
+            self.tts.speak(f"Tab: {tab_name}")
 
     def _logout(self):
         self.ctrl.progress_subject.detach(self._observer)
@@ -88,6 +115,8 @@ class LearnerView(tk.Frame):
         self.assign_listbox.pack(fill="both", expand=True, pady=5)
         self.assign_listbox.bind("<<ListboxSelect>>",
                                  self._on_assignment_select)
+        self.assign_listbox.bind("<Return>",
+                                 self._on_assignment_select)
 
         right = tk.Frame(tab)
         right.pack(side="left", fill="both", expand=True, padx=5, pady=5)
@@ -97,6 +126,9 @@ class LearnerView(tk.Frame):
         self.course_listbox = AccessibleListbox(right, tts=self.tts,
                                                 height=8, width=40)
         self.course_listbox.pack(fill="both", expand=True, pady=5)
+
+        self.course_listbox.bind("<Return>",
+                                 lambda e: self._open_course())
 
         AccessibleButton(right, tts=self.tts, text="Open Course",
                          command=self._open_course).pack(pady=5)
@@ -147,6 +179,7 @@ class LearnerView(tk.Frame):
         dlg.title(f"Course: {course.title}")
         dlg.geometry("600x500")
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         AccessibleLabel(dlg, text=course.title,
                         font=("Arial", 14, "bold")).pack(padx=10, pady=5)
@@ -214,6 +247,9 @@ class LearnerView(tk.Frame):
         AccessibleButton(btn_frame, tts=self.tts, text="Close",
                          command=dlg.destroy).pack(side="right", padx=5)
 
+        # Keyboard navigation for dialog
+        dlg.bind("<Escape>", lambda e: dlg.destroy())
+
         # Auto-read via TTS
         if self.tts and contents:
             self.tts.speak(f"Opening course: {course.title}. "
@@ -278,6 +314,7 @@ class LearnerView(tk.Frame):
                                                 height=12, width=25)
         self.career_listbox.pack(fill="y", expand=True, pady=5)
         self.career_listbox.bind("<<ListboxSelect>>", self._on_career_select)
+        self.career_listbox.bind("<Return>", self._on_career_select)
 
         for field in CAREER_PATHS:
             self.career_listbox.insert(tk.END, field)
@@ -323,6 +360,7 @@ class LearnerView(tk.Frame):
                                              height=8, width=60)
         self.opp_listbox.pack(fill="both", expand=True, padx=10, pady=10)
         self.opp_listbox.bind("<<ListboxSelect>>", self._on_opp_select)
+        self.opp_listbox.bind("<Return>", self._on_opp_select)
 
         self.opp_detail = AccessibleLabel(tab, text="", wraplength=500,
                                           justify="left")
@@ -356,6 +394,7 @@ class LearnerView(tk.Frame):
         dlg = tk.Toplevel(self)
         dlg.title("Accessibility Settings")
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         prefs = self.user.accessibility_prefs
 

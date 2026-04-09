@@ -21,6 +21,23 @@ class ProgressRepository:
                     (learner_id, assignment_id, course.course_id))
         self._conn.commit()
 
+    def create_progress_row(self, learner_id, assignment_id, course_id):
+        """Create a single progress row for a course."""
+        c = self._conn.cursor()
+        c.execute(
+            """INSERT INTO progress (learner_id, assignment_id, course_id,
+               completed, completed_date)
+               VALUES (?, ?, ?, 0, '')""",
+            (learner_id, assignment_id, course_id))
+        self._conn.commit()
+
+    def get_tracked_course_ids(self, assignment_id):
+        """Return set of course_ids that already have progress rows."""
+        c = self._conn.cursor()
+        c.execute("SELECT course_id FROM progress WHERE assignment_id = ?",
+                  (assignment_id,))
+        return {row[0] for row in c.fetchall()}
+
     def mark_course_completed(self, learner_id, assignment_id, course_id,
                               completed_date=""):
         c = self._conn.cursor()

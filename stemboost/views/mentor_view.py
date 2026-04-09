@@ -111,6 +111,7 @@ class MentorView(tk.Frame):
         dlg = tk.Toplevel(self)
         dlg.title(f"Assign: {path.title}")
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         AccessibleLabel(dlg, text="Select Learner:").pack(padx=10, pady=5)
         learner_var = tk.StringVar()
@@ -233,6 +234,7 @@ class MentorView(tk.Frame):
         dlg = tk.Toplevel(self)
         dlg.title("Register New Learner")
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         fields = [("Name", "name"), ("Username", "username"),
                   ("Email", "email"), ("Password", "password")]
@@ -250,14 +252,41 @@ class MentorView(tk.Frame):
         AccessibleLabel(dlg, text="Vision Type:").grid(
             row=row, column=0, padx=10, pady=4, sticky="e")
         vision_var = tk.StringVar(value="blind")
-        ttk.Combobox(dlg, textvariable=vision_var,
-                     values=["blind", "low_vision"], state="readonly",
-                     width=27).grid(row=row, column=1, padx=10, pady=4)
+        acc_audio = tk.BooleanVar(value=True)
+        acc_contrast = tk.BooleanVar(value=False)
+        acc_large = tk.BooleanVar(value=False)
+
+        def on_vision_change(event=None):
+            if vision_var.get() == "blind":
+                acc_audio.set(True)
+                acc_contrast.set(False)
+                acc_large.set(False)
+            elif vision_var.get() == "low_vision":
+                acc_audio.set(False)
+                acc_contrast.set(True)
+                acc_large.set(True)
+
+        vision_combo = ttk.Combobox(
+            dlg, textvariable=vision_var,
+            values=["blind", "low_vision"], state="readonly", width=27)
+        vision_combo.grid(row=row, column=1, padx=10, pady=4)
+        vision_combo.bind("<<ComboboxSelected>>", on_vision_change)
+
+        AccessibleLabel(dlg, text="Accessibility:").grid(
+            row=row + 1, column=0, padx=10, pady=4, sticky="ne")
+        acc_frame = tk.Frame(dlg)
+        acc_frame.grid(row=row + 1, column=1, sticky="w", padx=10)
+        tk.Checkbutton(acc_frame, text="Audio (TTS)",
+                       variable=acc_audio).pack(anchor="w")
+        tk.Checkbutton(acc_frame, text="High Contrast",
+                       variable=acc_contrast).pack(anchor="w")
+        tk.Checkbutton(acc_frame, text="Large Text",
+                       variable=acc_large).pack(anchor="w")
 
         AccessibleLabel(dlg, text="STEM Interests:").grid(
-            row=row + 1, column=0, padx=10, pady=4, sticky="ne")
+            row=row + 2, column=0, padx=10, pady=4, sticky="ne")
         interest_frame = tk.Frame(dlg)
-        interest_frame.grid(row=row + 1, column=1, sticky="w", padx=10)
+        interest_frame.grid(row=row + 2, column=1, sticky="w", padx=10)
         interest_vars = {}
         for field in STEM_FIELDS:
             var = tk.BooleanVar(value=False)
@@ -277,8 +306,9 @@ class MentorView(tk.Frame):
                     password=vals["password"], name=vals["name"],
                     mentor_id=self.user.user_id,
                     vision_type=vision_var.get(),
-                    accessibility_prefs={"audio": True, "high_contrast": False,
-                                         "large_text": False},
+                    accessibility_prefs={"audio": acc_audio.get(),
+                                         "high_contrast": acc_contrast.get(),
+                                         "large_text": acc_large.get()},
                     stem_interests=interests)
                 dlg.destroy()
                 self._refresh_learners_list()
@@ -290,7 +320,7 @@ class MentorView(tk.Frame):
                 messagebox.showerror("Error", str(e))
 
         AccessibleButton(dlg, tts=self.tts, text="Register",
-                         command=save).grid(row=row + 2, column=1, pady=10,
+                         command=save).grid(row=row + 3, column=1, pady=10,
                                             sticky="e", padx=10)
 
     # ------------------------------------------------------------------ #
@@ -335,6 +365,7 @@ class MentorView(tk.Frame):
         dlg = tk.Toplevel(self)
         dlg.title("Post Opportunity")
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         AccessibleLabel(dlg, text="Title:").grid(row=0, column=0, padx=10,
                                                   pady=5, sticky="e")

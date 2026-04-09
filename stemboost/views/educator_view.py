@@ -161,6 +161,7 @@ class EducatorView(tk.Frame):
         dlg = tk.Toplevel(self)
         dlg.title(title)
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         AccessibleLabel(dlg, text="Title:").grid(row=0, column=0, padx=10,
                                                   pady=5, sticky="e")
@@ -235,6 +236,7 @@ class EducatorView(tk.Frame):
         dlg = tk.Toplevel(self)
         dlg.title(title)
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         AccessibleLabel(dlg, text="Title:").grid(row=0, column=0, padx=10,
                                                   pady=5, sticky="e")
@@ -304,6 +306,7 @@ class EducatorView(tk.Frame):
         dlg = tk.Toplevel(self)
         dlg.title(title)
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         AccessibleLabel(dlg, text="Title:").grid(row=0, column=0, padx=10,
                                                   pady=5, sticky="e")
@@ -361,6 +364,7 @@ class EducatorView(tk.Frame):
         dlg = tk.Toplevel(self)
         dlg.title("Update Expertise Areas")
         dlg.grab_set()
+        self.ctx.accessibility.apply_theme(dlg)
 
         current = self.ctrl.get_expertise(self.user.user_id)
         exp_vars = {}

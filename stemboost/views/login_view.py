@@ -105,9 +105,9 @@ class LoginView(tk.Frame):
 
         AccessibleLabel(form, text="Role:").grid(
             row=row_offset, column=0, sticky="e", pady=4, padx=5)
-        self.role_var = tk.StringVar(value="learner")
+        self.role_var = tk.StringVar(value="educator")
         role_combo = ttk.Combobox(form, textvariable=self.role_var,
-                                  values=["educator", "mentor", "learner"],
+                                  values=["educator", "mentor"],
                                   state="readonly", width=27)
         role_combo.grid(row=row_offset, column=1, pady=4)
         role_combo.bind("<<ComboboxSelected>>", self._on_role_change)
@@ -141,9 +141,12 @@ class LoginView(tk.Frame):
         AccessibleLabel(self.learner_frame, text="Vision Type:").grid(
             row=0, column=0, sticky="e", padx=5)
         self.vision_var = tk.StringVar(value="blind")
-        ttk.Combobox(self.learner_frame, textvariable=self.vision_var,
-                     values=["blind", "low_vision"], state="readonly",
-                     width=27).grid(row=0, column=1, pady=4)
+        vision_combo = ttk.Combobox(
+            self.learner_frame, textvariable=self.vision_var,
+            values=["blind", "low_vision"], state="readonly", width=27)
+        vision_combo.grid(row=0, column=1, pady=4)
+        vision_combo.bind("<<ComboboxSelected>>",
+                          self._on_vision_type_change)
 
         AccessibleLabel(self.learner_frame,
                         text="Accessibility:").grid(
@@ -171,6 +174,18 @@ class LoginView(tk.Frame):
             tk.Checkbutton(interest_frame, text=field,
                            variable=var).pack(anchor="w")
             self.interest_vars[field] = var
+
+    def _on_vision_type_change(self, event):
+        """Auto-preselect accessibility features based on vision type."""
+        vision = self.vision_var.get()
+        if vision == "blind":
+            self.acc_audio.set(True)
+            self.acc_contrast.set(False)
+            self.acc_large.set(False)
+        elif vision == "low_vision":
+            self.acc_audio.set(False)
+            self.acc_contrast.set(True)
+            self.acc_large.set(True)
 
     def _on_role_change(self, event):
         role = self.role_var.get()

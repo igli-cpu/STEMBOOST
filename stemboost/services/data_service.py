@@ -250,6 +250,14 @@ class DataService:
             learner_id, aid, courses, excluded_course_ids)
         return aid
 
+    def get_assignment_for_learner_path(self, learner_id, path_id):
+        return self._assignments.get_assignment_for_learner_path(
+            learner_id, path_id)
+
+    def update_excluded_courses(self, assignment_id, excluded_course_ids):
+        self._assignments.update_excluded_courses(
+            assignment_id, excluded_course_ids)
+
     def get_assignments_by_learner(self, learner_id):
         return self._assignments.get_assignments_by_learner(learner_id)
 
@@ -259,6 +267,13 @@ class DataService:
     # ------------------------------------------------------------------ #
     # Progress delegation
     # ------------------------------------------------------------------ #
+    def create_progress_row(self, learner_id, assignment_id, course_id):
+        self._progress.create_progress_row(learner_id, assignment_id,
+                                           course_id)
+
+    def get_tracked_course_ids(self, assignment_id):
+        return self._progress.get_tracked_course_ids(assignment_id)
+
     def mark_course_completed(self, learner_id, assignment_id, course_id,
                               completed_date=""):
         self._progress.mark_course_completed(learner_id, assignment_id,

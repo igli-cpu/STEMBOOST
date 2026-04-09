@@ -27,6 +27,29 @@ class MentorController:
 
     def assign_path(self, mentor_id, learner_id, path_id,
                     excluded_course_ids=None):
+        """Assign a path to a learner. If the path is already assigned,
+        merge the course selection (remove newly included courses from
+        the exclusion list) instead of creating a duplicate."""
+        existing = self.ds.get_assignment_for_learner_path(
+            learner_id, path_id)
+        if existing:
+            # Merge: keep only courses excluded in BOTH old and new
+            old_excluded = set(existing.excluded_course_ids)
+            new_excluded = set(excluded_course_ids or [])
+            merged_excluded = list(old_excluded & new_excluded)
+            self.ds.update_excluded_courses(
+                existing.assignment_id, merged_excluded)
+            # Create progress rows for courses that are newly included
+            already_tracked = self.ds.get_tracked_course_ids(
+                existing.assignment_id)
+            all_courses = self.ds.get_courses_by_path(path_id)
+            for course in all_courses:
+                if (course.course_id not in merged_excluded
+                        and course.course_id not in already_tracked):
+                    self.ds.create_progress_row(
+                        learner_id, existing.assignment_id, course.course_id)
+            return existing.assignment_id
+
         today = date.today().isoformat()
         return self.ds.create_assignment(
             mentor_id, learner_id, path_id,

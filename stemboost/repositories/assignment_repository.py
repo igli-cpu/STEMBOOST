@@ -19,6 +19,25 @@ class AssignmentRepository:
         self._conn.commit()
         return c.lastrowid
 
+    def get_assignment_for_learner_path(self, learner_id, path_id):
+        """Return existing assignment for a learner+path combo, or None."""
+        c = self._conn.cursor()
+        c.execute(
+            "SELECT * FROM assignments WHERE learner_id = ? AND path_id = ?",
+            (learner_id, path_id))
+        row = c.fetchone()
+        return self._row_to_assignment(row) if row else None
+
+    def update_excluded_courses(self, assignment_id, excluded_course_ids):
+        """Update the excluded_course_ids for an existing assignment."""
+        excluded_str = ",".join(str(x) for x in (excluded_course_ids or []))
+        c = self._conn.cursor()
+        c.execute(
+            "UPDATE assignments SET excluded_course_ids = ? "
+            "WHERE assignment_id = ?",
+            (excluded_str, assignment_id))
+        self._conn.commit()
+
     def get_assignments_by_learner(self, learner_id):
         c = self._conn.cursor()
         c.execute("SELECT * FROM assignments WHERE learner_id = ?", (learner_id,))

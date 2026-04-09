@@ -11,6 +11,7 @@ _BASE_THEME = {
     "entry_bg": "#ffffff",
     "entry_fg": "#1a1a1a",
     "highlight": "#4a90d9",
+    "highlight_fg": "#ffffff",
     "font_size": 12,
 }
 
@@ -18,11 +19,12 @@ _BASE_THEME = {
 _HIGH_CONTRAST_DELTA = {
     "bg": "#000000",
     "fg": "#ffffff",
-    "button_bg": "#333333",
-    "button_fg": "#ffffff",
+    "button_bg": "#ffffff",
+    "button_fg": "#000000",
     "entry_bg": "#1a1a1a",
     "entry_fg": "#ffffff",
-    "highlight": "#ffff00",
+    "highlight": "#00ccff",
+    "highlight_fg": "#000000",
 }
 
 _LARGE_TEXT_DELTA = {
@@ -71,7 +73,7 @@ class AccessibilityService:
                 widget.configure(bg=theme["button_bg"], fg=theme["button_fg"],
                                  font=("Arial", theme["font_size"]),
                                  activebackground=theme["highlight"],
-                                 activeforeground=theme["fg"])
+                                 activeforeground=theme["highlight_fg"])
             elif widget_class == "Entry":
                 widget.configure(bg=theme["entry_bg"], fg=theme["entry_fg"],
                                  font=("Arial", theme["font_size"]),
@@ -83,7 +85,8 @@ class AccessibilityService:
             elif widget_class == "Listbox":
                 widget.configure(bg=theme["entry_bg"], fg=theme["entry_fg"],
                                  font=("Arial", theme["font_size"]),
-                                 selectbackground=theme["highlight"])
+                                 selectbackground=theme["highlight"],
+                                 selectforeground=theme["highlight_fg"])
             elif widget_class in ("TCombobox", "Combobox"):
                 pass  # ttk widgets styled differently
         except tk.TclError:
