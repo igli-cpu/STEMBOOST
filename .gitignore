@@ -1,0 +1,9 @@
+**/.DS_Store
+.python-version
+**/.pyc
+
+__pycache__/
+*.pyc
+*$py.class
+
+.venv

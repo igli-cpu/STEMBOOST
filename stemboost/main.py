@@ -17,12 +17,21 @@ from stemboost.views.login_view import LoginView
 from stemboost.views.educator_view import EducatorView
 from stemboost.views.mentor_view import MentorView
 from stemboost.views.learner_view import LearnerView
+from stemboost.views.view_context import ViewContext
 from stemboost.data.seed_data import seed
 
 
 class StemboostApp:
     """Main application controller. Owns the Tk root, services, and
     coordinates navigation between views."""
+
+    # Registry: maps role names to view classes (Open/Closed Principle).
+    # Adding a new role = adding one entry here, no show_dashboard changes.
+    _dashboard_registry = {
+        "educator": EducatorView,
+        "mentor": MentorView,
+        "learner": LearnerView,
+    }
 
     def __init__(self):
         self.root = tk.Tk()
@@ -45,6 +54,20 @@ class StemboostApp:
         self.mentor_ctrl = MentorController(self.ds)
         self.learner_ctrl = LearnerController(self.ds)
 
+        # ViewContext: decouples views from this concrete class
+        self.ctx = ViewContext(
+            tts=self.tts,
+            accessibility=self.accessibility,
+            auth=self.auth,
+            educator_ctrl=self.educator_ctrl,
+            mentor_ctrl=self.mentor_ctrl,
+            learner_ctrl=self.learner_ctrl,
+            root=self.root,
+            show_login=self.show_login,
+            show_dashboard=self.show_dashboard,
+            reset_demo_data=self.reset_demo_data,
+        )
+
         # Container for swappable views
         self._current_view = None
         self.container = tk.Frame(self.root)
@@ -57,9 +80,7 @@ class StemboostApp:
         self.show_login()
 
     def _seed_if_empty(self):
-        c = self.ds.conn.cursor()
-        c.execute("SELECT COUNT(*) FROM users")
-        if c.fetchone()[0] == 0:
+        if not self.ds.has_users():
             seed(self.ds)
 
     def reset_demo_data(self):
@@ -71,24 +92,24 @@ class StemboostApp:
 
     def show_login(self):
         self.auth.logout()
-        self._switch_view(LoginView(self.container, self))
+        self._switch_view(LoginView(self.container, self.ctx))
 
     def show_dashboard(self, user):
-        """Route to the appropriate dashboard based on user role."""
-        if user.role == "educator":
-            view = EducatorView(self.container, self, user)
-        elif user.role == "mentor":
-            view = MentorView(self.container, self, user)
-        elif user.role == "learner":
-            # Apply learner's accessibility preferences
-            self.accessibility.update_from_prefs(user.accessibility_prefs)
-            view = LearnerView(self.container, self, user)
-        else:
+        """Route to the appropriate dashboard via the role registry."""
+        view_class = self._dashboard_registry.get(user.role)
+        if view_class is None:
             self.show_login()
             return
+
+        # Apply learner's accessibility preferences
+        if user.role == "learner":
+            self.accessibility.update_from_prefs(user.accessibility_prefs)
+            self.tts.enabled = self.accessibility.audio_enabled
+
+        view = view_class(self.container, self.ctx, user)
         self._switch_view(view)
 
-        # Apply accessibility theme after view is packed
+        # Apply accessibility theme after view is packed (learners only)
         if user.role == "learner":
             self.root.after(100,
                             lambda: self.accessibility.apply_theme(self.root))

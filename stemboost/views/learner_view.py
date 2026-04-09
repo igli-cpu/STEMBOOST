@@ -4,57 +4,7 @@ from tkinter import ttk, messagebox
 from stemboost.views.widgets import (AccessibleButton, AccessibleLabel,
                                      AccessibleListbox, clear_frame)
 from stemboost.services.observer import ProgressObserver
-from stemboost.models.assessment import Assessment
-
-
-# STEM career path information (REQ-L-008)
-CAREER_PATHS = {
-    "Computer Science": (
-        "Computer Science careers include software developer, systems architect, "
-        "cybersecurity analyst, and database administrator. The field is growing "
-        "rapidly with strong demand across all industries. Many roles offer "
-        "remote work options and competitive salaries."
-    ),
-    "Data Science": (
-        "Data Science combines statistics, programming, and domain expertise. "
-        "Roles include data analyst, machine learning engineer, and business "
-        "intelligence specialist. Data scientists are in high demand in "
-        "healthcare, finance, and technology sectors."
-    ),
-    "Mathematics": (
-        "Mathematics careers span academia, finance, and technology. "
-        "Actuaries, statisticians, and operations researchers use math daily. "
-        "Strong math skills are foundational for careers in engineering, "
-        "physics, and computer science."
-    ),
-    "Biology": (
-        "Biology careers include research scientist, biotechnologist, "
-        "environmental consultant, and medical laboratory technician. "
-        "Growing fields include genomics, bioinformatics, and conservation "
-        "biology."
-    ),
-    "Engineering": (
-        "Engineering spans many specializations: mechanical, electrical, "
-        "civil, chemical, and biomedical. Engineers design, build, and "
-        "optimize systems and structures. The field offers hands-on problem "
-        "solving and strong job prospects."
-    ),
-    "Physics": (
-        "Physics careers range from research and academia to applied roles "
-        "in engineering, medical physics, and data analysis. Understanding "
-        "physics is valuable in aerospace, energy, and technology sectors."
-    ),
-    "Chemistry": (
-        "Chemistry careers include pharmaceutical research, materials "
-        "science, environmental analysis, and quality control. Chemists "
-        "work in labs, manufacturing, and regulatory agencies."
-    ),
-    "Environmental Science": (
-        "Environmental Science careers focus on sustainability, conservation, "
-        "and pollution management. Roles include environmental consultant, "
-        "climate analyst, and conservation scientist."
-    ),
-}
+from stemboost.models.constants import STEM_FIELDS, CAREER_PATHS
 
 
 class LearnerProgressObserver(ProgressObserver):
@@ -64,23 +14,28 @@ class LearnerProgressObserver(ProgressObserver):
         self.view = view
 
     def on_progress_update(self, learner_id, assignment_id, completed, total):
-        if hasattr(self.view, '_refresh_progress_display'):
-            self.view._refresh_progress_display()
+        self.view._refresh_progress_display()
 
 
 class LearnerView(tk.Frame):
     """Learner dashboard: view assignments, consume content, track progress."""
 
-    def __init__(self, parent, app, user):
+    def __init__(self, parent, ctx, user):
         super().__init__(parent)
-        self.app = app
-        self.tts = app.tts
+        self.ctx = ctx
+        self.tts = ctx.tts
         self.user = user
-        self.ctrl = app.learner_ctrl
+        self.ctrl = ctx.learner_ctrl
 
         # Register as observer for progress updates
         self._observer = LearnerProgressObserver(self)
         self.ctrl.progress_subject.attach(self._observer)
+
+        # Initialize state attributes (set properly by event handlers later)
+        self._current_assignment = None
+        self._assignments = []
+        self._courses = []
+        self._opp_list = []
 
         self._build()
 
@@ -114,7 +69,7 @@ class LearnerView(tk.Frame):
 
     def _logout(self):
         self.ctrl.progress_subject.detach(self._observer)
-        self.app.show_login()
+        self.ctx.show_login()
 
     # ------------------------------------------------------------------ #
     # Tab 1: My Assignments
@@ -419,7 +374,7 @@ class LearnerView(tk.Frame):
                         font=("Arial", 11, "bold")).pack(
                             anchor="w", padx=20, pady=(10, 5))
         interest_vars = {}
-        for field in Assessment.STEM_FIELDS:
+        for field in STEM_FIELDS:
             var = tk.BooleanVar(value=(field in self.user.stem_interests))
             tk.Checkbutton(dlg, text=field,
                            variable=var).pack(anchor="w", padx=30)
@@ -439,8 +394,9 @@ class LearnerView(tk.Frame):
             self.user.stem_interests = new_interests
 
             # Apply accessibility changes
-            self.app.accessibility.update_from_prefs(new_prefs)
-            self.app.accessibility.apply_theme(self.app.root)
+            self.ctx.accessibility.update_from_prefs(new_prefs)
+            self.tts.enabled = self.ctx.accessibility.audio_enabled
+            self.ctx.accessibility.apply_theme(self.ctx.root)
 
             dlg.destroy()
             if self.tts:

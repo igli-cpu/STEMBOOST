@@ -4,7 +4,7 @@ from tkinter import ttk, messagebox
 from stemboost.views.widgets import (AccessibleButton, AccessibleLabel,
                                      AccessibleEntry, AccessibleText,
                                      AccessibleListbox, clear_frame)
-from stemboost.models.assessment import Assessment
+from stemboost.models.constants import STEM_FIELDS
 
 
 CATEGORIES = [
@@ -18,14 +18,17 @@ CATEGORIES = [
 class EducatorView(tk.Frame):
     """Educator dashboard: manage learning paths, courses, and content."""
 
-    def __init__(self, parent, app, user):
+    def __init__(self, parent, ctx, user):
         super().__init__(parent)
-        self.app = app
-        self.tts = app.tts
+        self.ctx = ctx
+        self.tts = ctx.tts
         self.user = user
-        self.ctrl = app.educator_ctrl
+        self.ctrl = ctx.educator_ctrl
         self._selected_path = None
         self._selected_course = None
+        self._paths = []
+        self._courses = []
+        self._contents = []
         self._build()
 
     def _build(self):
@@ -37,7 +40,7 @@ class EducatorView(tk.Frame):
         AccessibleLabel(header, text=f"Educator: {self.user.name}",
                         font=("Arial", 16, "bold")).pack(side="left")
         AccessibleButton(header, tts=self.tts, text="Logout",
-                         command=self.app.show_login).pack(side="right")
+                         command=self.ctx.show_login).pack(side="right")
         AccessibleButton(header, tts=self.tts, text="Update Expertise",
                          command=self._show_expertise).pack(side="right", padx=5)
 
@@ -361,7 +364,7 @@ class EducatorView(tk.Frame):
 
         current = self.ctrl.get_expertise(self.user.user_id)
         exp_vars = {}
-        for i, field in enumerate(Assessment.STEM_FIELDS):
+        for i, field in enumerate(STEM_FIELDS):
             var = tk.BooleanVar(value=(field in current))
             tk.Checkbutton(dlg, text=field, variable=var).grid(
                 row=i, column=0, sticky="w", padx=20, pady=2)
@@ -376,5 +379,5 @@ class EducatorView(tk.Frame):
                 self.tts.speak("Expertise areas updated.")
 
         AccessibleButton(dlg, tts=self.tts, text="Save",
-                         command=save).grid(row=len(Assessment.STEM_FIELDS),
+                         command=save).grid(row=len(STEM_FIELDS),
                                             column=0, pady=10)

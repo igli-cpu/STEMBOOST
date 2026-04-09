@@ -11,26 +11,33 @@ class TTSFacade:
 
     _instance = None
     _lock = threading.Lock()
+    _initializing = False  # Guard against direct instantiation
 
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
+                    cls._initializing = True
                     cls._instance = TTSFacade()
+                    cls._initializing = False
         return cls._instance
 
     def __init__(self):
+        if not TTSFacade._initializing:
+            raise RuntimeError(
+                "Use TTSFacade.get_instance() instead of TTSFacade()")
         import pyttsx3
         self._engine = pyttsx3.init()
         self._engine.setProperty("rate", 175)
         self._engine.setProperty("volume", 1.0)
         self._speaking = False
         self._speech_lock = threading.Lock()
+        self.enabled = True  # Controls whether speak() actually produces audio
 
     def speak(self, text):
         """Speak text in a background thread so the GUI is not blocked."""
-        if not text:
+        if not text or not self.enabled:
             return
         thread = threading.Thread(target=self._speak_blocking, args=(text,),
                                   daemon=True)

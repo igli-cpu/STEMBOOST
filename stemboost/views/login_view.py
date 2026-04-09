@@ -3,16 +3,16 @@ from tkinter import ttk, messagebox
 
 from stemboost.views.widgets import (AccessibleButton, AccessibleLabel,
                                      AccessibleEntry, clear_frame)
-from stemboost.models.assessment import Assessment
+from stemboost.models.constants import STEM_FIELDS
 
 
 class LoginView(tk.Frame):
     """Login and registration screen."""
 
-    def __init__(self, parent, app):
+    def __init__(self, parent, ctx):
         super().__init__(parent)
-        self.app = app
-        self.tts = app.tts
+        self.ctx = ctx
+        self.tts = ctx.tts
         self._build_login_form()
 
     def _build_login_form(self):
@@ -69,11 +69,11 @@ class LoginView(tk.Frame):
             if self.tts:
                 self.tts.speak("Please enter username and password.")
             return
-        user = self.app.auth.login(username, password)
+        user = self.ctx.auth.login(username, password)
         if user:
             if self.tts:
                 self.tts.speak(f"Welcome, {user.name}. Logged in as {user.role}.")
-            self.app.show_dashboard(user)
+            self.ctx.show_dashboard(user)
         else:
             messagebox.showerror("Login Failed", "Invalid username or password.")
             if self.tts:
@@ -166,7 +166,7 @@ class LoginView(tk.Frame):
         interest_frame = tk.Frame(self.learner_frame)
         interest_frame.grid(row=2, column=1, sticky="w")
         self.interest_vars = {}
-        for field in Assessment.STEM_FIELDS:
+        for field in STEM_FIELDS:
             var = tk.BooleanVar(value=False)
             tk.Checkbutton(interest_frame, text=field,
                            variable=var).pack(anchor="w")
@@ -194,7 +194,7 @@ class LoginView(tk.Frame):
             exp_frame = tk.Frame(self.educator_frame)
             exp_frame.grid(row=0, column=1, sticky="w")
             self.expertise_vars = {}
-            for field in Assessment.STEM_FIELDS:
+            for field in STEM_FIELDS:
                 var = tk.BooleanVar(value=False)
                 tk.Checkbutton(exp_frame, text=field,
                                variable=var).pack(anchor="w")
@@ -228,7 +228,7 @@ class LoginView(tk.Frame):
                 f for f, v in self.expertise_vars.items() if v.get()]
 
         try:
-            self.app.auth.register(username, email, password, name, role,
+            self.ctx.auth.register(username, email, password, name, role,
                                    **kwargs)
             messagebox.showinfo("Success", "Account created. Please login.")
             if self.tts:
@@ -241,7 +241,7 @@ class LoginView(tk.Frame):
 
     def _on_reset(self):
         if messagebox.askyesno("Reset", "Reset all data to initial demo state?"):
-            self.app.reset_demo_data()
+            self.ctx.reset_demo_data()
             if self.tts:
                 self.tts.speak("Demo data has been reset.")
             messagebox.showinfo("Reset", "Demo data reset successfully.")

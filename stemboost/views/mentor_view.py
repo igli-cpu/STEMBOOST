@@ -4,19 +4,23 @@ from tkinter import ttk, messagebox
 from stemboost.views.widgets import (AccessibleButton, AccessibleLabel,
                                      AccessibleEntry, AccessibleText,
                                      AccessibleListbox, clear_frame)
-from stemboost.models.assessment import Assessment
+from stemboost.models.constants import STEM_FIELDS
 
 
 class MentorView(tk.Frame):
     """Mentor dashboard: browse content, assign paths, monitor progress,
     register learners, and post opportunities."""
 
-    def __init__(self, parent, app, user):
+    def __init__(self, parent, ctx, user):
         super().__init__(parent)
-        self.app = app
-        self.tts = app.tts
+        self.ctx = ctx
+        self.tts = ctx.tts
         self.user = user
-        self.ctrl = app.mentor_ctrl
+        self.ctrl = ctx.mentor_ctrl
+        self._paths = []
+        self._learners = []
+        self._browse_courses = []
+        self._opportunities = []
         self._build()
 
     def _build(self):
@@ -28,7 +32,7 @@ class MentorView(tk.Frame):
         AccessibleLabel(header, text=f"Mentor: {self.user.name}",
                         font=("Arial", 16, "bold")).pack(side="left")
         AccessibleButton(header, tts=self.tts, text="Logout",
-                         command=self.app.show_login).pack(side="right")
+                         command=self.ctx.show_login).pack(side="right")
 
         # Notebook tabs
         notebook = ttk.Notebook(self)
@@ -255,7 +259,7 @@ class MentorView(tk.Frame):
         interest_frame = tk.Frame(dlg)
         interest_frame.grid(row=row + 1, column=1, sticky="w", padx=10)
         interest_vars = {}
-        for field in Assessment.STEM_FIELDS:
+        for field in STEM_FIELDS:
             var = tk.BooleanVar(value=False)
             tk.Checkbutton(interest_frame, text=field,
                            variable=var).pack(anchor="w")

@@ -85,27 +85,6 @@ class AccessibleListbox(tk.Listbox):
                 self.tts.speak(text)
 
 
-class ScrollableFrame(tk.Frame):
-    """A frame with a vertical scrollbar, useful for long content lists."""
-
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.canvas = tk.Canvas(self, highlightthickness=0)
-        self.scrollbar = tk.Scrollbar(self, orient="vertical",
-                                      command=self.canvas.yview)
-        self.inner_frame = tk.Frame(self.canvas)
-
-        self.inner_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-
-        self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-
 def clear_frame(frame):
     """Destroy all children of a frame."""
     for child in frame.winfo_children():

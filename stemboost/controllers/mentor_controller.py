@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 from datetime import date
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from stemboost.services.interfaces import DataServiceProtocol
 
 
 class MentorController:
     """Business logic for mentor actions: assign, monitor, post opportunities."""
 
-    def __init__(self, data_service):
+    def __init__(self, data_service: DataServiceProtocol):
         self.ds = data_service
 
     def browse_all_paths(self):
@@ -46,11 +52,7 @@ class MentorController:
         return self.ds.get_progress_for_assignment(assignment_id)
 
     def get_path_by_id(self, path_id):
-        paths = self.ds.get_all_learning_paths()
-        for p in paths:
-            if p.path_id == path_id:
-                return p
-        return None
+        return self.ds.get_learning_path_by_id(path_id)
 
     def post_opportunity(self, title, description, opp_type, mentor_id):
         today = date.today().isoformat()

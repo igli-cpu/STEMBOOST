@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 from datetime import date
+from typing import TYPE_CHECKING
 
 from stemboost.services.observer import ProgressSubject
+
+if TYPE_CHECKING:
+    from stemboost.services.interfaces import DataServiceProtocol
 
 
 class LearnerController:
     """Business logic for learner actions: consume content, track progress."""
 
-    def __init__(self, data_service):
+    def __init__(self, data_service: DataServiceProtocol):
         self.ds = data_service
         self.progress_subject = ProgressSubject()
 
@@ -14,11 +20,7 @@ class LearnerController:
         return self.ds.get_assignments_by_learner(learner_id)
 
     def get_path_info(self, path_id):
-        paths = self.ds.get_all_learning_paths()
-        for p in paths:
-            if p.path_id == path_id:
-                return p
-        return None
+        return self.ds.get_learning_path_by_id(path_id)
 
     def get_courses_for_assignment(self, assignment):
         """Return courses for an assignment, excluding opted-out ones."""

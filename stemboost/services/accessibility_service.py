@@ -2,8 +2,8 @@ import tkinter as tk
 import tkinter.font as tkfont
 
 
-# Default theme colors
-THEME_NORMAL = {
+# Base theme — the starting point for all theme composition
+_BASE_THEME = {
     "bg": "#f0f0f0",
     "fg": "#1a1a1a",
     "button_bg": "#e0e0e0",
@@ -14,7 +14,8 @@ THEME_NORMAL = {
     "font_size": 12,
 }
 
-THEME_HIGH_CONTRAST = {
+# Deltas that override specific keys when enabled
+_HIGH_CONTRAST_DELTA = {
     "bg": "#000000",
     "fg": "#ffffff",
     "button_bg": "#333333",
@@ -22,34 +23,21 @@ THEME_HIGH_CONTRAST = {
     "entry_bg": "#1a1a1a",
     "entry_fg": "#ffffff",
     "highlight": "#ffff00",
-    "font_size": 12,
 }
 
-THEME_LARGE_TEXT = {
-    "bg": "#f0f0f0",
-    "fg": "#1a1a1a",
-    "button_bg": "#e0e0e0",
-    "button_fg": "#1a1a1a",
-    "entry_bg": "#ffffff",
-    "entry_fg": "#1a1a1a",
-    "highlight": "#4a90d9",
-    "font_size": 18,
-}
-
-THEME_HIGH_CONTRAST_LARGE = {
-    "bg": "#000000",
-    "fg": "#ffffff",
-    "button_bg": "#333333",
-    "button_fg": "#ffffff",
-    "entry_bg": "#1a1a1a",
-    "entry_fg": "#ffffff",
-    "highlight": "#ffff00",
+_LARGE_TEXT_DELTA = {
     "font_size": 18,
 }
 
 
 class AccessibilityService:
-    """Applies accessibility settings (contrast, text size, TTS) to the UI."""
+    """Applies accessibility settings (contrast, text size, TTS) to the UI.
+
+    Themes are composed by overlaying deltas onto a base theme. This is
+    Open/Closed: adding a new accessibility dimension (e.g., dyslexia-friendly
+    font) only requires defining one new delta dict — no modification to
+    get_theme() or any branching logic.
+    """
 
     def __init__(self):
         self.audio_enabled = True
@@ -57,14 +45,12 @@ class AccessibilityService:
         self.large_text = False
 
     def get_theme(self):
-        if self.high_contrast and self.large_text:
-            return THEME_HIGH_CONTRAST_LARGE
-        elif self.high_contrast:
-            return THEME_HIGH_CONTRAST
-        elif self.large_text:
-            return THEME_LARGE_TEXT
-        else:
-            return THEME_NORMAL
+        theme = dict(_BASE_THEME)
+        if self.high_contrast:
+            theme.update(_HIGH_CONTRAST_DELTA)
+        if self.large_text:
+            theme.update(_LARGE_TEXT_DELTA)
+        return theme
 
     def apply_theme(self, widget):
         """Recursively apply the current theme to a widget and its children."""
@@ -104,7 +90,7 @@ class AccessibilityService:
             pass
 
     def update_from_prefs(self, prefs):
-        """Update settings from a learner's accessibility_prefs dict."""
+        """Update settings from a user's accessibility_prefs dict."""
         self.audio_enabled = prefs.get("audio", True)
         self.high_contrast = prefs.get("high_contrast", False)
         self.large_text = prefs.get("large_text", False)

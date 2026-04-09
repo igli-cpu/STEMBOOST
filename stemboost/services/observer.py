@@ -27,7 +27,10 @@ class ProgressSubject:
             self._observers.append(observer)
 
     def detach(self, observer):
-        self._observers.remove(observer)
+        try:
+            self._observers.remove(observer)
+        except ValueError:
+            pass  # Already detached or never attached
 
     def notify(self, learner_id, assignment_id, completed, total):
         for observer in self._observers:

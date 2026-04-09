@@ -1,10 +1,15 @@
-from stemboost.services.data_service import DataService
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from stemboost.services.interfaces import DataServiceProtocol
 
 
 class AuthController:
     """Handles login, registration, and session management."""
 
-    def __init__(self, data_service):
+    def __init__(self, data_service: DataServiceProtocol):
         self.ds = data_service
         self.current_user = None
 
@@ -16,7 +21,18 @@ class AuthController:
         return user
 
     def register(self, username, email, password, name, role, **kwargs):
-        """Create a new account. Returns user_id or raises on duplicate."""
+        """Create a new account. Returns user_id or raises on invalid input."""
+        if not username or not username.strip():
+            raise ValueError("Username is required.")
+        if not name or not name.strip():
+            raise ValueError("Name is required.")
+        if not email or "@" not in email:
+            raise ValueError("A valid email address is required.")
+        if not password or len(password) < 6:
+            raise ValueError("Password must be at least 6 characters.")
+        if role not in ("educator", "mentor", "learner"):
+            raise ValueError(f"Invalid role: {role!r}")
+
         user_id = self.ds.create_user(
             username=username, email=email, password=password,
             name=name, role=role, **kwargs)
