@@ -360,6 +360,20 @@ class EducatorView(tk.Frame):
                 self.tts.speak("Content deleted.")
 
     # ---- Expertise dialog ----
+    def get_help_text(self):
+        """Return F1 help text describing the current location and navigation."""
+        return (
+            "You are on the Educator Dashboard. "
+            "The screen is divided into three columns: Learning Paths, Courses, and Content. "
+            "Start by selecting a learning path from the left list using arrow keys. "
+            "Its courses appear in the middle column. Select a course to see its content on the right. "
+            "Below each list are buttons to create, edit, or delete items. "
+            "Press Tab to move between the lists and buttons. "
+            "Use the Update Expertise button in the top right to manage your STEM expertise areas. "
+            "Press Escape to return to the login screen. "
+            "Press F1 at any time to hear this help again."
+        )
+
     def _show_expertise(self):
         dlg = tk.Toplevel(self)
         dlg.title("Update Expertise Areas")

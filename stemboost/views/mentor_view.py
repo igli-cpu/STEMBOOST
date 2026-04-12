@@ -21,6 +21,7 @@ class MentorView(tk.Frame):
         self._learners = []
         self._browse_courses = []
         self._opportunities = []
+        self._tab_help = {}  # tab widget id -> help text for F1
         self._build()
 
     def _build(self):
@@ -35,12 +36,12 @@ class MentorView(tk.Frame):
                          command=self.ctx.show_login).pack(side="right")
 
         # Notebook tabs
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill="both", expand=True, padx=10, pady=5)
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill="both", expand=True, padx=10, pady=5)
 
-        self._build_browse_tab(notebook)
-        self._build_learners_tab(notebook)
-        self._build_opportunities_tab(notebook)
+        self._build_browse_tab(self.notebook)
+        self._build_learners_tab(self.notebook)
+        self._build_opportunities_tab(self.notebook)
 
         if self.tts:
             self.tts.speak("Mentor dashboard. Browse content, manage learners, "
@@ -52,6 +53,15 @@ class MentorView(tk.Frame):
     def _build_browse_tab(self, notebook):
         tab = tk.Frame(notebook)
         notebook.add(tab, text="Browse & Assign")
+        self._tab_help[str(tab)] = (
+            "On the left is a list of all learning paths. "
+            "Select a path with arrow keys to see its courses on the right. "
+            "Use the Assign to Learner button to assign the selected path to one of your learners. "
+            "Press Tab to move between the lists and buttons. "
+            "You have three tabs: Browse and Assign, My Learners, and Opportunities. "
+            "Press Escape to return to the login screen. "
+            "Press F1 at any time to hear this help again."
+        )
 
         left = tk.Frame(tab)
         left.pack(side="left", fill="both", expand=True, padx=5, pady=5)
@@ -157,6 +167,13 @@ class MentorView(tk.Frame):
     def _build_learners_tab(self, notebook):
         tab = tk.Frame(notebook)
         notebook.add(tab, text="My Learners")
+        self._tab_help[str(tab)] = (
+            "This tab shows your registered learners and their progress. "
+            "Use the Register New Learner button to add a new learner. "
+            "Select a learner from the list to view their progress below. "
+            "Press Tab to move between controls. "
+            "Press Escape to return to the login screen."
+        )
 
         top_btns = tk.Frame(tab)
         top_btns.pack(fill="x", padx=10, pady=5)
@@ -326,9 +343,30 @@ class MentorView(tk.Frame):
     # ------------------------------------------------------------------ #
     # Tab 3: Opportunities
     # ------------------------------------------------------------------ #
+    def get_help_text(self):
+        """Return F1 help text describing the current location and navigation."""
+        try:
+            tab_id = self.notebook.select()
+            tab_name = self.notebook.tab(tab_id, "text")
+        except Exception:
+            tab_id, tab_name = None, "unknown"
+
+        base = f"You are on the Mentor Dashboard, {tab_name} tab. "
+        return base + self._tab_help.get(tab_id, (
+            "Press Tab to move between controls. "
+            "Press Escape to return to the login screen."
+        ))
+
     def _build_opportunities_tab(self, notebook):
         tab = tk.Frame(notebook)
         notebook.add(tab, text="Opportunities")
+        self._tab_help[str(tab)] = (
+            "This tab lists internship and academic opportunities. "
+            "Use the Post New Opportunity button to create a new one. "
+            "Select an opportunity from the list to see its details. "
+            "Press Tab to move between controls. "
+            "Press Escape to return to the login screen."
+        )
 
         AccessibleButton(tab, tts=self.tts, text="Post New Opportunity",
                          command=self._post_opportunity_dialog).pack(

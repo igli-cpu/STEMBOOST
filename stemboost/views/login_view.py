@@ -254,6 +254,34 @@ class LoginView(tk.Frame):
             if self.tts:
                 self.tts.speak(f"Registration failed. {e}")
 
+    def get_help_text(self):
+        """Return F1 help text describing the current location and navigation."""
+        # Check if we're on the registration form by looking for reg_entries
+        if hasattr(self, 'reg_entries') and self.reg_entries:
+            # Check if the registration form is currently visible
+            try:
+                if self.reg_entries["name"].winfo_ismapped():
+                    return (
+                        "You are on the Registration page. "
+                        "Fill in your Name, Username, Email, and Password. "
+                        "Then choose a role from the dropdown. "
+                        "Press Tab to move between fields. "
+                        "Press the Create Account button or Tab to it and press Enter. "
+                        "Press the Back to Login button to return to the login screen. "
+                        "Press Escape to return to login."
+                    )
+            except tk.TclError:
+                pass
+        return (
+            "You are on the Login page. "
+            "There are two text fields: Username and Password. "
+            "Press Tab to move between the fields and buttons. "
+            "Type your username, press Tab, type your password, "
+            "then press Enter to log in. "
+            "Or Tab to the Register button and press Enter to create a new account. "
+            "Press Escape at any time to return to this login screen."
+        )
+
     def _on_reset(self):
         if messagebox.askyesno("Reset", "Reset all data to initial demo state?"):
             self.ctx.reset_demo_data()
