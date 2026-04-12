@@ -92,8 +92,12 @@ class LearnerView(tk.Frame):
     def _on_tab_change(self, event):
         """Announce the active tab via TTS when the user switches tabs."""
         if self.tts:
-            tab_name = self.notebook.tab(self.notebook.select(), "text")
-            self.tts.speak(f"Tab: {tab_name}")
+            tab_id = self.notebook.select()
+            tab_name = self.notebook.tab(tab_id, "text")
+            if tab_name == "My Progress":
+                self._refresh_progress_display(announce=True)
+            else:
+                self.tts.speak(f"Tab: {tab_name}")
 
     def _logout(self):
         self.ctrl.progress_subject.detach(self._observer)
@@ -281,7 +285,7 @@ class LearnerView(tk.Frame):
         )
         self._refresh_progress_display()
 
-    def _refresh_progress_display(self):
+    def _refresh_progress_display(self, announce=False):
         clear_frame(self.progress_tab)
         AccessibleLabel(self.progress_tab, text="Your Progress",
                         font=("Arial", 14, "bold")).pack(padx=10, pady=10)
@@ -290,8 +294,11 @@ class LearnerView(tk.Frame):
         if not assignments:
             AccessibleLabel(self.progress_tab,
                             text="No assignments yet.").pack(padx=10)
+            if announce and self.tts:
+                self.tts.speak("You have no assignments yet.")
             return
 
+        speech_parts = []
         for a in assignments:
             path = self.ctrl.get_path_info(a.path_id)
             completed, total = self.ctrl.get_progress(a.assignment_id)
@@ -315,6 +322,20 @@ class LearnerView(tk.Frame):
                 AccessibleLabel(row, text="PATH COMPLETE",
                                 fg="green",
                                 font=("Arial", 10, "bold")).pack(side="left")
+                speech_parts.append(
+                    f"{name}: completed! All {total} courses consumed.")
+            else:
+                percent = int((completed / total) * 100) if total > 0 else 0
+                speech_parts.append(
+                    f"{name}: {completed} out of {total} courses consumed, "
+                    f"{percent} percent complete.")
+
+        if announce and self.tts:
+            summary = (f"Tab: My Progress. "
+                       f"You have {len(assignments)} assigned "
+                       f"{'path' if len(assignments) == 1 else 'paths'}. ")
+            summary += " ".join(speech_parts)
+            self.tts.speak(summary)
 
     # ------------------------------------------------------------------ #
     # Tab 3: STEM Careers
