@@ -76,6 +76,15 @@ class StemboostApp:
         # Keyboard navigation: Escape goes back to login
         self.root.bind("<Escape>", lambda e: self.show_login())
 
+        # F1 Helpdesk: announce current location and navigation hints.
+        # Listbox has a class-level <Key> binding (type-ahead search) that
+        # returns "break" and swallows all key events before bind_all sees
+        # them.  A more-specific <F1> class binding overrides <Key> for
+        # that event, and by not returning "break" it lets the event
+        # propagate to bind_all where our handler lives.
+        self.root.bind_class("Listbox", "<F1>", lambda e: None)
+        self.root.bind_all("<F1>", lambda e: self._announce_help())
+
         # Start with login
         self.show_login()
 
@@ -113,6 +122,21 @@ class StemboostApp:
         if user.role == "learner":
             self.root.after(100,
                             lambda: self.accessibility.apply_theme(self.root))
+
+    def _announce_help(self):
+        """F1 Helpdesk: announce the current page and navigation hints via TTS."""
+        if self._current_view and hasattr(self._current_view, 'get_help_text'):
+            help_text = self._current_view.get_help_text()
+        else:
+            help_text = (
+                "Welcome to STEMBOOST. "
+                "Press Tab to move between controls. "
+                "Press Enter to activate buttons. "
+                "Press Escape to return to the login screen."
+            )
+        if self.tts:
+            self.tts.stop()
+            self.tts.speak(help_text)
 
     def _switch_view(self, new_view):
         if self._current_view is not None:

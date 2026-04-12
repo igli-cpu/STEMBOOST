@@ -33,18 +33,35 @@ class TTSFacade:
         self._engine.setProperty("volume", 1.0)
         self._speaking = False
         self._speech_lock = threading.Lock()
+        self._generation = 0        # incremented on every speak/stop
+        self._generation_lock = threading.Lock()
         self.enabled = True  # Controls whether speak() actually produces audio
 
     def speak(self, text):
-        """Speak text in a background thread so the GUI is not blocked."""
+        """Speak text in a background thread so the GUI is not blocked.
+
+        If a previous utterance is still playing or queued, it is
+        superseded: the engine is stopped and queued threads bail out
+        once they acquire the lock and notice a newer generation.
+        """
         if not text or not self.enabled:
             return
-        thread = threading.Thread(target=self._speak_blocking, args=(text,),
-                                  daemon=True)
+        with self._generation_lock:
+            self._generation += 1
+            gen = self._generation
+        try:
+            self._engine.stop()
+        except RuntimeError:
+            pass
+        thread = threading.Thread(target=self._speak_blocking,
+                                  args=(text, gen), daemon=True)
         thread.start()
 
-    def _speak_blocking(self, text):
+    def _speak_blocking(self, text, gen):
         with self._speech_lock:
+            # Another speak() or stop() arrived while we waited — skip.
+            if gen != self._generation:
+                return
             self._speaking = True
             try:
                 self._engine.say(text)
@@ -55,6 +72,9 @@ class TTSFacade:
                 self._speaking = False
 
     def stop(self):
+        """Cancel current and queued speech."""
+        with self._generation_lock:
+            self._generation += 1
         try:
             self._engine.stop()
         except RuntimeError:

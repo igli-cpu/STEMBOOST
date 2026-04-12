@@ -36,6 +36,7 @@ class LearnerView(tk.Frame):
         self._assignments = []
         self._courses = []
         self._opp_list = []
+        self._tab_help = {}  # tab widget id -> help text for F1
 
         self._build()
 
@@ -104,6 +105,16 @@ class LearnerView(tk.Frame):
     def _build_assignments_tab(self, notebook):
         tab = tk.Frame(notebook)
         notebook.add(tab, text="My Assignments")
+        self._tab_help[str(tab)] = (
+            "On the left is a list of your assigned learning paths. "
+            "Use the arrow keys to select a path, then press Enter to load its courses. "
+            "On the right is the list of courses in the selected path. "
+            "Select a course and press Enter or Tab to the Open Course button. "
+            "Press Tab to move between the lists and buttons. "
+            "You have four tabs: My Assignments, My Progress, STEM Careers, and Opportunities. "
+            "Press Escape to return to the login screen. "
+            "Press F1 at any time to hear this help again."
+        )
 
         left = tk.Frame(tab)
         left.pack(side="left", fill="both", expand=True, padx=5, pady=5)
@@ -261,6 +272,13 @@ class LearnerView(tk.Frame):
     def _build_progress_tab(self, notebook):
         self.progress_tab = tk.Frame(notebook)
         notebook.add(self.progress_tab, text="My Progress")
+        self._tab_help[str(self.progress_tab)] = (
+            "This tab shows your progress across all assigned learning paths. "
+            "Each path displays how many courses you have completed. "
+            "Press Tab to move between items. "
+            "Switch to other tabs using Tab to reach the tab bar, then use arrow keys. "
+            "Press Escape to return to the login screen."
+        )
         self._refresh_progress_display()
 
     def _refresh_progress_display(self):
@@ -304,6 +322,13 @@ class LearnerView(tk.Frame):
     def _build_careers_tab(self, notebook):
         tab = tk.Frame(notebook)
         notebook.add(tab, text="STEM Careers")
+        self._tab_help[str(tab)] = (
+            "On the left is a list of STEM career fields. "
+            "Use arrow keys to browse careers, and press Enter to select one. "
+            "The career details appear on the right. "
+            "Tab to the Read Aloud button to hear the career information. "
+            "Press Escape to return to the login screen."
+        )
 
         left = tk.Frame(tab)
         left.pack(side="left", fill="y", padx=5, pady=5)
@@ -355,6 +380,13 @@ class LearnerView(tk.Frame):
     def _build_opportunities_tab(self, notebook):
         tab = tk.Frame(notebook)
         notebook.add(tab, text="Opportunities")
+        self._tab_help[str(tab)] = (
+            "This tab lists available internship and academic opportunities. "
+            "Use arrow keys to browse the list. "
+            "Select an opportunity to see its description below. "
+            "Tab to the Read Aloud button to hear the details. "
+            "Press Escape to return to the login screen."
+        )
 
         self.opp_listbox = AccessibleListbox(tab, tts=self.tts,
                                              height=8, width=60)
@@ -390,6 +422,20 @@ class LearnerView(tk.Frame):
     # ------------------------------------------------------------------ #
     # Settings
     # ------------------------------------------------------------------ #
+    def get_help_text(self):
+        """Return F1 help text describing the current location and navigation."""
+        try:
+            tab_id = self.notebook.select()
+            tab_name = self.notebook.tab(tab_id, "text")
+        except Exception:
+            tab_id, tab_name = None, "unknown"
+
+        base = f"You are on the Learner Dashboard, {tab_name} tab. "
+        return base + self._tab_help.get(tab_id, (
+            "Press Tab to move between controls. "
+            "Press Escape to return to the login screen."
+        ))
+
     def _show_settings(self):
         dlg = tk.Toplevel(self)
         dlg.title("Accessibility Settings")
