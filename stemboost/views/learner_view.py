@@ -56,6 +56,7 @@ class LearnerView(tk.Frame):
         # Navigation help banner
         help_text = (
             "Navigation: Press Tab to move between controls. "
+            "Press Ctrl+Tab to go to the next tab, Ctrl+Shift+Tab to go to the previous tab. "
             "Press Enter to activate the selected item. "
             "Use Arrow keys to browse lists. "
             "Press Escape to close dialogs or return to login."
@@ -78,11 +79,19 @@ class LearnerView(tk.Frame):
         # Announce tab changes via TTS
         self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
 
+        # Ctrl+Tab / Ctrl+Shift+Tab cycle through notebook tabs from anywhere
+        # inside the notebook (including from within listboxes whose <Key>
+        # class binding would otherwise swallow the event).
+        self.notebook.bind("<Control-Tab>", self._ctrl_tab_next)
+        self.notebook.bind("<Control-Shift-Tab>", self._ctrl_tab_prev)
+
         if self.tts:
             self.tts.speak(
                 f"Welcome, {self.user.name}. Your learner dashboard is ready. "
                 "Here is how to navigate: "
                 "Press Tab to move between controls and Shift Tab to go back. "
+                "Press Control Tab to switch to the next tab, "
+                "or Control Shift Tab to go to the previous tab. "
                 "Press Enter to activate the selected item. "
                 "Use the arrow keys to browse items in a list. "
                 "Press Escape to close a dialog or return to the login screen. "
@@ -98,6 +107,22 @@ class LearnerView(tk.Frame):
                 self._refresh_progress_display(announce=True)
             else:
                 self.tts.speak(f"Tab: {tab_name}")
+
+    def _ctrl_tab_next(self, event=None):
+        """Advance to the next notebook tab (Ctrl+Tab)."""
+        tabs = self.notebook.tabs()
+        if tabs:
+            idx = list(tabs).index(self.notebook.select())
+            self.notebook.select((idx + 1) % len(tabs))
+        return "break"
+
+    def _ctrl_tab_prev(self, event=None):
+        """Go back to the previous notebook tab (Ctrl+Shift+Tab)."""
+        tabs = self.notebook.tabs()
+        if tabs:
+            idx = list(tabs).index(self.notebook.select())
+            self.notebook.select((idx - 1) % len(tabs))
+        return "break"
 
     def _logout(self):
         self.ctrl.progress_subject.detach(self._observer)
@@ -115,6 +140,7 @@ class LearnerView(tk.Frame):
             "On the right is the list of courses in the selected path. "
             "Select a course and press Enter or Tab to the Open Course button. "
             "Press Tab to move between the lists and buttons. "
+            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
             "You have four tabs: My Assignments, My Progress, STEM Careers, and Opportunities. "
             "Press Escape to return to the login screen. "
             "Press F1 at any time to hear this help again."
@@ -280,7 +306,7 @@ class LearnerView(tk.Frame):
             "This tab shows your progress across all assigned learning paths. "
             "Each path displays how many courses you have completed. "
             "Press Tab to move between items. "
-            "Switch to other tabs using Tab to reach the tab bar, then use arrow keys. "
+            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
             "Press Escape to return to the login screen."
         )
         self._refresh_progress_display()
@@ -348,6 +374,7 @@ class LearnerView(tk.Frame):
             "Use arrow keys to browse careers, and press Enter to select one. "
             "The career details appear on the right. "
             "Tab to the Read Aloud button to hear the career information. "
+            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
             "Press Escape to return to the login screen."
         )
 
@@ -406,6 +433,7 @@ class LearnerView(tk.Frame):
             "Use arrow keys to browse the list. "
             "Select an opportunity to see its description below. "
             "Tab to the Read Aloud button to hear the details. "
+            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
             "Press Escape to return to the login screen."
         )
 

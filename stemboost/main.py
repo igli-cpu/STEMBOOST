@@ -79,11 +79,17 @@ class StemboostApp:
         # F1 Helpdesk: announce current location and navigation hints.
         # Listbox has a class-level <Key> binding (type-ahead search) that
         # returns "break" and swallows all key events before bind_all sees
-        # them.  A more-specific <F1> class binding overrides <Key> for
-        # that event, and by not returning "break" it lets the event
-        # propagate to bind_all where our handler lives.
+        # them.  A more-specific class binding overrides <Key> for a given
+        # event, and by not returning "break" it lets the event propagate
+        # up the widget hierarchy where our handlers live.
         self.root.bind_class("Listbox", "<F1>", lambda e: None)
         self.root.bind_all("<F1>", lambda e: self._announce_help())
+
+        # Allow Ctrl+Tab / Ctrl+Shift+Tab to propagate out of Listbox so
+        # that the ttk.Notebook widget-level bindings can switch tabs even
+        # when focus is inside a listbox inside a tab.
+        self.root.bind_class("Listbox", "<Control-Tab>", lambda e: None)
+        self.root.bind_class("Listbox", "<Control-Shift-Tab>", lambda e: None)
 
         # Start with login
         self.show_login()

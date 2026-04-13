@@ -43,9 +43,40 @@ class MentorView(tk.Frame):
         self._build_learners_tab(self.notebook)
         self._build_opportunities_tab(self.notebook)
 
+        # Announce tab changes via TTS
+        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
+
+        # Ctrl+Tab / Ctrl+Shift+Tab cycle through notebook tabs from anywhere
+        # inside the notebook (including from within listboxes).
+        self.notebook.bind("<Control-Tab>", self._ctrl_tab_next)
+        self.notebook.bind("<Control-Shift-Tab>", self._ctrl_tab_prev)
+
         if self.tts:
             self.tts.speak("Mentor dashboard. Browse content, manage learners, "
                            "or post opportunities.")
+
+    def _on_tab_change(self, event):
+        """Announce the active tab via TTS when the user switches tabs."""
+        if self.tts:
+            tab_id = self.notebook.select()
+            tab_name = self.notebook.tab(tab_id, "text")
+            self.tts.speak(f"Tab: {tab_name}")
+
+    def _ctrl_tab_next(self, event=None):
+        """Advance to the next notebook tab (Ctrl+Tab)."""
+        tabs = self.notebook.tabs()
+        if tabs:
+            idx = list(tabs).index(self.notebook.select())
+            self.notebook.select((idx + 1) % len(tabs))
+        return "break"
+
+    def _ctrl_tab_prev(self, event=None):
+        """Go back to the previous notebook tab (Ctrl+Shift+Tab)."""
+        tabs = self.notebook.tabs()
+        if tabs:
+            idx = list(tabs).index(self.notebook.select())
+            self.notebook.select((idx - 1) % len(tabs))
+        return "break"
 
     # ------------------------------------------------------------------ #
     # Tab 1: Browse & Assign
@@ -58,6 +89,7 @@ class MentorView(tk.Frame):
             "Select a path with arrow keys to see its courses on the right. "
             "Use the Assign to Learner button to assign the selected path to one of your learners. "
             "Press Tab to move between the lists and buttons. "
+            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
             "You have three tabs: Browse and Assign, My Learners, and Opportunities. "
             "Press Escape to return to the login screen. "
             "Press F1 at any time to hear this help again."
@@ -172,6 +204,7 @@ class MentorView(tk.Frame):
             "Use the Register New Learner button to add a new learner. "
             "Select a learner from the list to view their progress below. "
             "Press Tab to move between controls. "
+            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
             "Press Escape to return to the login screen."
         )
 
@@ -365,6 +398,7 @@ class MentorView(tk.Frame):
             "Use the Post New Opportunity button to create a new one. "
             "Select an opportunity from the list to see its details. "
             "Press Tab to move between controls. "
+            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
             "Press Escape to return to the login screen."
         )
 
