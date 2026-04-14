@@ -43,6 +43,7 @@ class StemboostApp:
         self.ds = DataService()
         self.ds.connect()
         self.tts = TTSFacade.get_instance()
+        self.tts.attach_to_root(self.root)
         self.accessibility = AccessibilityService()
 
         # Seed on first run (if users table is empty)

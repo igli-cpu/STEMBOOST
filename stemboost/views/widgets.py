@@ -68,11 +68,16 @@ class AccessibleText(tk.Text):
 
 
 class AccessibleListbox(tk.Listbox):
-    """A listbox that announces selected item via TTS."""
+    """A listbox that announces selected item via TTS.
 
-    def __init__(self, parent, tts=None, **kwargs):
+    `item_noun` names what each row represents (e.g. "Learning Path",
+    "Course") and is used in the selection announcement.
+    """
+
+    def __init__(self, parent, tts=None, item_noun="item", **kwargs):
         super().__init__(parent, **kwargs)
         self.tts = tts
+        self.item_noun = item_noun
         self.configure(takefocus=True)
         if tts:
             self.bind("<<ListboxSelect>>", self._on_select)
@@ -82,7 +87,7 @@ class AccessibleListbox(tk.Listbox):
             sel = self.curselection()
             if sel:
                 text = self.get(sel[0])
-                self.tts.speak(text)
+                self.tts.speak(f"Selected {self.item_noun}: {text}")
 
 
 def clear_frame(frame):

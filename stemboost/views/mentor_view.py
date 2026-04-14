@@ -101,9 +101,11 @@ class MentorView(tk.Frame):
         AccessibleLabel(left, text="Learning Paths",
                         font=("Arial", 12, "bold")).pack()
         self.path_listbox = AccessibleListbox(left, tts=self.tts,
+                                              item_noun="Learning Path",
                                               height=12, width=40)
         self.path_listbox.pack(fill="both", expand=True, pady=5)
-        self.path_listbox.bind("<<ListboxSelect>>", self._on_path_select)
+        self.path_listbox.bind("<<ListboxSelect>>", self._on_path_select,
+                               add="+")
 
         right = tk.Frame(tab)
         right.pack(side="left", fill="both", expand=True, padx=5, pady=5)
@@ -111,6 +113,7 @@ class MentorView(tk.Frame):
         AccessibleLabel(right, text="Courses in Path",
                         font=("Arial", 12, "bold")).pack()
         self.course_listbox = AccessibleListbox(right, tts=self.tts,
+                                                item_noun="Course",
                                                 height=12, width=40)
         self.course_listbox.pack(fill="both", expand=True, pady=5)
 
@@ -218,10 +221,11 @@ class MentorView(tk.Frame):
                              side="left", padx=5)
 
         self.learner_listbox = AccessibleListbox(tab, tts=self.tts,
+                                                 item_noun="Learner",
                                                  height=6, width=50)
         self.learner_listbox.pack(fill="x", padx=10, pady=5)
         self.learner_listbox.bind("<<ListboxSelect>>",
-                                  self._on_learner_select)
+                                  self._on_learner_select, add="+")
 
         AccessibleLabel(tab, text="Progress:",
                         font=("Arial", 12, "bold")).pack(padx=10, anchor="w")
@@ -251,7 +255,8 @@ class MentorView(tk.Frame):
             AccessibleLabel(self.progress_frame,
                             text="No assignments yet.").pack()
             if self.tts:
-                self.tts.speak(f"{learner.name} has no assignments yet.")
+                self.tts.speak(
+                    f"Selected Learner: {learner.name}. No assignments yet.")
             return
 
         for a in assignments:
@@ -277,8 +282,8 @@ class MentorView(tk.Frame):
             c0, t0 = self.ctrl.get_progress(a0.assignment_id)
             name0 = path0.title if path0 else "their path"
             self.tts.speak(
-                f"{learner.name} has completed {c0} out of {t0} courses "
-                f"in {name0}.")
+                f"Selected Learner: {learner.name}. "
+                f"Completed {c0} out of {t0} courses in {name0}.")
 
     def _register_learner_dialog(self):
         dlg = tk.Toplevel(self)
@@ -407,9 +412,11 @@ class MentorView(tk.Frame):
                              padx=10, pady=10, anchor="w")
 
         self.opp_listbox = AccessibleListbox(tab, tts=self.tts,
+                                             item_noun="Opportunity",
                                              height=10, width=60)
         self.opp_listbox.pack(fill="both", expand=True, padx=10, pady=5)
-        self.opp_listbox.bind("<<ListboxSelect>>", self._on_opp_select)
+        self.opp_listbox.bind("<<ListboxSelect>>", self._on_opp_select,
+                              add="+")
 
         self.opp_detail = AccessibleLabel(tab, text="", wraplength=500,
                                           justify="left")
@@ -431,7 +438,8 @@ class MentorView(tk.Frame):
         opp = self._opportunities[sel[0]]
         self.opp_detail.configure(text=opp.description)
         if self.tts:
-            self.tts.speak(f"{opp.title}. {opp.description}")
+            self.tts.speak(
+                f"Selected Opportunity: {opp.title}. {opp.description}")
 
     def _post_opportunity_dialog(self):
         dlg = tk.Toplevel(self)

@@ -152,10 +152,11 @@ class LearnerView(tk.Frame):
         AccessibleLabel(left, text="Assigned Paths",
                         font=("Arial", 12, "bold")).pack()
         self.assign_listbox = AccessibleListbox(left, tts=self.tts,
+                                                item_noun="Assigned Path",
                                                 height=8, width=40)
         self.assign_listbox.pack(fill="both", expand=True, pady=5)
         self.assign_listbox.bind("<<ListboxSelect>>",
-                                 self._on_assignment_select)
+                                 self._on_assignment_select, add="+")
         self.assign_listbox.bind("<Return>",
                                  self._on_assignment_select)
 
@@ -165,6 +166,7 @@ class LearnerView(tk.Frame):
         AccessibleLabel(right, text="Courses",
                         font=("Arial", 12, "bold")).pack()
         self.course_listbox = AccessibleListbox(right, tts=self.tts,
+                                                item_noun="Course",
                                                 height=8, width=40)
         self.course_listbox.pack(fill="both", expand=True, pady=5)
 
@@ -384,9 +386,11 @@ class LearnerView(tk.Frame):
         AccessibleLabel(left, text="Career Fields",
                         font=("Arial", 12, "bold")).pack()
         self.career_listbox = AccessibleListbox(left, tts=self.tts,
+                                                item_noun="Career Field",
                                                 height=12, width=25)
         self.career_listbox.pack(fill="y", expand=True, pady=5)
-        self.career_listbox.bind("<<ListboxSelect>>", self._on_career_select)
+        self.career_listbox.bind("<<ListboxSelect>>", self._on_career_select,
+                                 add="+")
         self.career_listbox.bind("<Return>", self._on_career_select)
 
         for field in CAREER_PATHS:
@@ -438,9 +442,11 @@ class LearnerView(tk.Frame):
         )
 
         self.opp_listbox = AccessibleListbox(tab, tts=self.tts,
+                                             item_noun="Opportunity",
                                              height=8, width=60)
         self.opp_listbox.pack(fill="both", expand=True, padx=10, pady=10)
-        self.opp_listbox.bind("<<ListboxSelect>>", self._on_opp_select)
+        self.opp_listbox.bind("<<ListboxSelect>>", self._on_opp_select,
+                              add="+")
         self.opp_listbox.bind("<Return>", self._on_opp_select)
 
         self.opp_detail = AccessibleLabel(tab, text="", wraplength=500,
