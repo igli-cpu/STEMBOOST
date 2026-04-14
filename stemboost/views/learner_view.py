@@ -2,7 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from stemboost.views.widgets import (AccessibleButton, AccessibleLabel,
-                                     AccessibleListbox, clear_frame)
+                                     AccessibleListbox,
+                                     AccessibleCheckbutton, clear_frame)
 from stemboost.services.observer import ProgressObserver
 from stemboost.models.constants import STEM_FIELDS, CAREER_PATHS
 
@@ -37,6 +38,12 @@ class LearnerView(tk.Frame):
         self._courses = []
         self._opp_list = []
         self._tab_help = {}  # tab widget id -> help text for F1
+        # Controls how _on_tab_change announces the new tab: "full" speaks
+        # the full help text, "brief" speaks only "Tab: {name}". Set to
+        # "brief" just before programmatic .select() calls that represent
+        # a quick label-cycle (Tab key), leaving the default "full" for
+        # mouse clicks.
+        self._pending_tab_announce = "full"
 
         self._build()
 
@@ -48,18 +55,46 @@ class LearnerView(tk.Frame):
         header.pack(fill="x", padx=10, pady=5)
         AccessibleLabel(header, text=f"Learner: {self.user.name}",
                         font=("Arial", 16, "bold")).pack(side="left")
-        AccessibleButton(header, tts=self.tts, text="Logout",
-                         command=self._logout).pack(side="right")
+        self._logout_btn = AccessibleButton(header, tts=self.tts, text="Logout",
+                                            command=self._logout)
+        self._logout_btn.pack(side="right")
         AccessibleButton(header, tts=self.tts, text="Settings",
                          command=self._show_settings).pack(side="right", padx=5)
+        self._help_btn = AccessibleButton(header, tts=self.tts, text="Help",
+                                          command=self._announce_help)
+        self._help_btn.pack(side="right", padx=5)
+
+        # Suppress the first FocusIn on Logout so it doesn't clobber the
+        # welcome speech when we programmatically set initial focus below.
+        self._skip_initial_logout_focus = True
+        original_logout_focus = self._logout_btn._on_focus
+
+        def wrapped_logout_focus(event):
+            if self._skip_initial_logout_focus:
+                self._skip_initial_logout_focus = False
+                return
+            original_logout_focus(event)
+
+        self._logout_btn.bind("<FocusIn>", wrapped_logout_focus)
+
+        # Explicit Tab/Shift-Tab bindings on the boundary buttons so the
+        # notebook is entered at the correct tab label for each direction.
+        self._help_btn.bind("<Tab>", self._on_help_tab_forward)
+        self._logout_btn.bind("<Shift-Tab>", self._on_logout_shift_tab_back)
+        self._logout_btn.bind("<ISO_Left_Tab>", self._on_logout_shift_tab_back)
 
         # Navigation help banner
         help_text = (
-            "Navigation: Press Tab to move between controls. "
-            "Press Ctrl+Tab to go to the next tab, Ctrl+Shift+Tab to go to the previous tab. "
-            "Press Enter to activate the selected item. "
-            "Use Arrow keys to browse lists. "
-            "Press Escape to close dialogs or return to login."
+            "Navigation: Press Tab or Shift+Tab to move between controls "
+            "and cycle tab labels. "
+            "Press Enter to activate a button, or to enter the content of "
+            "the focused tab. "
+            "Inside a list, press Tab or Down arrow to walk through items "
+            "without selecting, and press Enter to select the current item. "
+            "Press F1 or the Help button to repeat the current tab's "
+            "description. "
+            "Press Escape to step back: from inside a tab to its labels, "
+            "or from the main view back to login."
         )
         help_label = AccessibleLabel(
             self, tts=self.tts, text=help_text,
@@ -79,50 +114,227 @@ class LearnerView(tk.Frame):
         # Announce tab changes via TTS
         self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
 
-        # Ctrl+Tab / Ctrl+Shift+Tab cycle through notebook tabs from anywhere
-        # inside the notebook (including from within listboxes whose <Key>
-        # class binding would otherwise swallow the event).
-        self.notebook.bind("<Control-Tab>", self._ctrl_tab_next)
-        self.notebook.bind("<Control-Shift-Tab>", self._ctrl_tab_prev)
+        # Announce the tab label under the mouse when hovering, and the
+        # currently-selected tab when the notebook itself gains focus.
+        self._last_hovered_tab_idx = None
+        self.notebook.bind("<Motion>", self._on_notebook_motion)
+        self.notebook.bind("<Leave>", self._on_notebook_leave)
+        self.notebook.bind("<FocusIn>", self._on_notebook_focus)
+
+        # When focus is on the notebook itself, Tab/Shift-Tab cycle tab
+        # labels (brief announcement) instead of entering tab content.
+        # Enter is the explicit opt-in to move focus into the active tab.
+        self.notebook.bind("<Tab>", self._on_notebook_tab)
+        self.notebook.bind("<Shift-Tab>", self._on_notebook_shift_tab)
+        self.notebook.bind("<ISO_Left_Tab>", self._on_notebook_shift_tab)
+        self.notebook.bind("<Return>", self._on_notebook_enter)
+
+        # Move initial focus to Logout so Tab cycling starts from a known
+        # point outside the tab content. Scheduled via after_idle so it
+        # happens after the view is fully mapped.
+        self.after_idle(self._logout_btn.focus_set)
 
         if self.tts:
             self.tts.speak(
                 f"Welcome, {self.user.name}. Your learner dashboard is ready. "
                 "Here is how to navigate: "
                 "Press Tab to move between controls and Shift Tab to go back. "
-                "Press Control Tab to switch to the next tab, "
-                "or Control Shift Tab to go to the previous tab. "
-                "Press Enter to activate the selected item. "
-                "Use the arrow keys to browse items in a list. "
-                "Press Escape to close a dialog or return to the login screen. "
+                "When focus is on the tab labels, Tab and Shift Tab cycle "
+                "through them. Press Enter to enter the focused tab's content. "
+                "Inside a list, press Tab or Down arrow to walk through "
+                "items without selecting, and press Enter to select the "
+                "current item. "
+                "Press Escape to step back one level: from inside a tab's "
+                "content, Escape returns you to the tab labels; from the "
+                "tab labels or header buttons, Escape returns you to the "
+                "login screen; and inside a dialog, Escape closes it. "
+                "Press F1 at any time, or tab to the Help button in the top "
+                "right, to hear a description of the current tab. "
                 "You have four tabs: My Assignments, My Progress, "
                 "STEM Careers, and Opportunities.")
 
     def _on_tab_change(self, event):
-        """Announce the active tab via TTS when the user switches tabs."""
-        if self.tts:
+        """Announce the active tab when the selection changes."""
+        mode = self._pending_tab_announce
+        self._pending_tab_announce = "full"  # reset for next change
+        if not self.tts:
+            return
+        tab_id = self.notebook.select()
+        tab_name = self.notebook.tab(tab_id, "text")
+        if mode == "brief":
+            self.tts.speak(f"Tab: {tab_name}")
+            return
+        help_text = self._tab_help.get(tab_id, "")
+        intro = f"Tab: {tab_name}. {help_text}".strip()
+        if tab_name == "My Progress":
+            self._refresh_progress_display(announce=True, prefix=intro + " ")
+        else:
+            self.tts.speak(intro)
+
+    def _announce_help(self):
+        """Speak the help text for the current tab. Shared by Help button and F1."""
+        if not self.tts:
+            return
+        self.tts.stop()
+        self.tts.speak(self.get_help_text())
+
+    def _on_notebook_motion(self, event):
+        """Announce the tab label currently under the mouse, once per tab."""
+        if not self.tts:
+            return
+        try:
+            elem = self.notebook.identify(event.x, event.y)
+        except tk.TclError:
+            return
+        if "label" not in elem:
+            self._last_hovered_tab_idx = None
+            return
+        try:
+            idx = self.notebook.index(f"@{event.x},{event.y}")
+        except tk.TclError:
+            return
+        if idx == self._last_hovered_tab_idx:
+            return
+        self._last_hovered_tab_idx = idx
+        tab_name = self.notebook.tab(idx, "text")
+        self.tts.speak(f"Tab: {tab_name}")
+
+    def _on_notebook_leave(self, event):
+        self._last_hovered_tab_idx = None
+
+    def _on_notebook_focus(self, event):
+        """Announce the currently selected tab when the notebook gains focus.
+
+        Entry direction (forward vs backward) is handled by explicit Tab
+        and Shift-Tab bindings on the Help and Logout buttons, which set
+        the target tab before focus arrives here. So this handler only
+        announces — it does not reset.
+        """
+        if not self.tts:
+            return
+        try:
             tab_id = self.notebook.select()
             tab_name = self.notebook.tab(tab_id, "text")
-            if tab_name == "My Progress":
-                self._refresh_progress_display(announce=True)
-            else:
-                self.tts.speak(f"Tab: {tab_name}")
+        except tk.TclError:
+            return
+        self.tts.speak(f"Tab: {tab_name}")
 
-    def _ctrl_tab_next(self, event=None):
-        """Advance to the next notebook tab (Ctrl+Tab)."""
+    def _on_notebook_tab(self, event):
+        """Advance to the next tab label. At the last tab, exit the notebook
+        forward so the user can tab back out to the header buttons."""
+        # Tkinter's <Tab> pattern also matches Shift+Tab because unmentioned
+        # modifiers are don't-cares. Route Shift+Tab to the other handler.
+        if event.state & 0x1:
+            return self._on_notebook_shift_tab(event)
         tabs = self.notebook.tabs()
-        if tabs:
-            idx = list(tabs).index(self.notebook.select())
-            self.notebook.select((idx + 1) % len(tabs))
+        if not tabs:
+            return "break"
+        idx = list(tabs).index(self.notebook.select())
+        if idx < len(tabs) - 1:
+            self._pending_tab_announce = "brief"
+            self.notebook.select(idx + 1)
+        else:
+            self._logout_btn.focus_set()
         return "break"
 
-    def _ctrl_tab_prev(self, event=None):
-        """Go back to the previous notebook tab (Ctrl+Shift+Tab)."""
+    def _on_notebook_shift_tab(self, event):
+        """Step backward through tab labels. At the first tab, exit the
+        notebook backward to the Help button."""
         tabs = self.notebook.tabs()
-        if tabs:
-            idx = list(tabs).index(self.notebook.select())
-            self.notebook.select((idx - 1) % len(tabs))
+        if not tabs:
+            return "break"
+        idx = list(tabs).index(self.notebook.select())
+        if idx > 0:
+            self._pending_tab_announce = "brief"
+            self.notebook.select(idx - 1)
+        else:
+            self._help_btn.focus_set()
         return "break"
+
+    def _on_help_tab_forward(self, event):
+        """Tab from the Help button: enter the notebook at tab 0.
+
+        Must ignore Shift+Tab — otherwise the key repeat bounces between
+        Help and the notebook forever, because the bare <Tab> pattern
+        also matches Shift+Tab in Tkinter.
+        """
+        if event.state & 0x1:  # Shift held — let default traversal run
+            return None
+        tabs = self.notebook.tabs()
+        if not tabs:
+            return None
+        self._pending_tab_announce = "brief"
+        self.notebook.select(tabs[0])
+        self.notebook.focus_set()
+        return "break"
+
+    def _on_logout_shift_tab_back(self, event):
+        """Shift+Tab from the Logout button: enter the notebook at the last
+        tab so the user can cycle backward through tab labels."""
+        tabs = self.notebook.tabs()
+        if not tabs:
+            return None
+        self._pending_tab_announce = "brief"
+        self.notebook.select(tabs[-1])
+        self.notebook.focus_set()
+        return "break"
+
+    def _on_notebook_enter(self, event):
+        """Move focus into the first focusable widget of the active tab."""
+        try:
+            tab_id = self.notebook.select()
+        except tk.TclError:
+            return "break"
+        tab_widget = None
+        for child in self.notebook.winfo_children():
+            if str(child) == tab_id:
+                tab_widget = child
+                break
+        if tab_widget is None:
+            return "break"
+        first = self._first_focusable(tab_widget)
+        if first is not None:
+            first.focus_set()
+            if self.tts:
+                self.tts.speak(
+                    "Entered tab. Press Escape to return to the tab labels.")
+        elif self.tts:
+            self.tts.speak("This tab has no focusable controls.")
+        return "break"
+
+    def _bind_escape_to_notebook(self, tab_frame):
+        """Bind Escape on every focusable descendant of a tab frame so
+        pressing Escape inside tab content returns focus to the notebook
+        tab labels, rather than firing the root-level Escape that logs
+        the user out to the login screen.
+        """
+        def handler(event):
+            self.notebook.focus_set()
+            return "break"
+
+        def walk(widget):
+            try:
+                if str(widget.cget("takefocus")) in ("1", "True"):
+                    widget.bind("<Escape>", handler)
+            except tk.TclError:
+                pass
+            for child in widget.winfo_children():
+                walk(child)
+
+        walk(tab_frame)
+
+    def _first_focusable(self, parent):
+        for child in parent.winfo_children():
+            try:
+                tf = str(child.cget("takefocus"))
+                if tf in ("1", "True"):
+                    return child
+            except tk.TclError:
+                pass
+            found = self._first_focusable(child)
+            if found is not None:
+                return found
+        return None
 
     def _logout(self):
         self.ctrl.progress_subject.detach(self._observer)
@@ -136,13 +348,14 @@ class LearnerView(tk.Frame):
         notebook.add(tab, text="My Assignments")
         self._tab_help[str(tab)] = (
             "On the left is a list of your assigned learning paths. "
-            "Use the arrow keys to select a path, then press Enter to load its courses. "
-            "On the right is the list of courses in the selected path. "
-            "Select a course and press Enter or Tab to the Open Course button. "
-            "Press Tab to move between the lists and buttons. "
-            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
+            "Press Tab or Down arrow to walk through the paths, then press "
+            "Enter to load the courses for the highlighted path. "
+            "On the right is the list of courses. Press Tab or Down arrow "
+            "to walk through the courses, then press Enter to open the "
+            "highlighted course. "
+            "Press Tab or Shift Tab on the notebook to cycle tab labels. "
             "You have four tabs: My Assignments, My Progress, STEM Careers, and Opportunities. "
-            "Press Escape to return to the login screen. "
+            "Press Escape to go back: to the tab labels from inside the tab, or to the login screen from the tab labels. "
             "Press F1 at any time to hear this help again."
         )
 
@@ -151,30 +364,30 @@ class LearnerView(tk.Frame):
 
         AccessibleLabel(left, text="Assigned Paths",
                         font=("Arial", 12, "bold")).pack()
-        self.assign_listbox = AccessibleListbox(left, tts=self.tts,
-                                                height=8, width=40)
+        self.assign_listbox = AccessibleListbox(
+            left, tts=self.tts,
+            item_noun="Assigned Path",
+            on_activate=self._on_assignment_select,
+            height=8, width=40)
         self.assign_listbox.pack(fill="both", expand=True, pady=5)
-        self.assign_listbox.bind("<<ListboxSelect>>",
-                                 self._on_assignment_select)
-        self.assign_listbox.bind("<Return>",
-                                 self._on_assignment_select)
 
         right = tk.Frame(tab)
         right.pack(side="left", fill="both", expand=True, padx=5, pady=5)
 
         AccessibleLabel(right, text="Courses",
                         font=("Arial", 12, "bold")).pack()
-        self.course_listbox = AccessibleListbox(right, tts=self.tts,
-                                                height=8, width=40)
+        self.course_listbox = AccessibleListbox(
+            right, tts=self.tts,
+            item_noun="Course",
+            on_activate=lambda e: self._open_course(),
+            height=8, width=40)
         self.course_listbox.pack(fill="both", expand=True, pady=5)
-
-        self.course_listbox.bind("<Return>",
-                                 lambda e: self._open_course())
 
         AccessibleButton(right, tts=self.tts, text="Open Course",
                          command=self._open_course).pack(pady=5)
 
         self._refresh_assignments()
+        self._bind_escape_to_notebook(tab)
 
     def _refresh_assignments(self):
         self.assign_listbox.delete(0, tk.END)
@@ -216,10 +429,26 @@ class LearnerView(tk.Frame):
         """Open a window to consume course content via TTS."""
         contents = self.ctrl.get_contents(course.course_id)
 
+        # Remember the widget that opened the dialog so we can restore
+        # focus to it after the dialog closes.
+        previous_focus = self.focus_get()
+
+        def close_and_restore():
+            dlg.destroy()
+            if previous_focus is not None:
+                try:
+                    previous_focus.focus_set()
+                except tk.TclError:
+                    pass
+
         dlg = tk.Toplevel(self)
         dlg.title(f"Course: {course.title}")
         dlg.geometry("600x500")
         dlg.grab_set()
+        # Move keyboard focus into the dialog so <Escape> reaches the
+        # dialog's binding instead of the previously-focused widget
+        # (whose Escape would bubble up to root → logout).
+        dlg.focus_set()
         self.ctx.accessibility.apply_theme(dlg)
 
         AccessibleLabel(dlg, text=course.title,
@@ -273,9 +502,12 @@ class LearnerView(tk.Frame):
                 messagebox.showinfo("Complete",
                                     f"Course complete! {completed}/{total} "
                                     "courses consumed.")
-                dlg.destroy()
-                self._on_assignment_select(None)
+                close_and_restore()
+                prev_idx = self.assign_listbox.curselection()
                 self._refresh_assignments()
+                if prev_idx:
+                    self.assign_listbox.selection_set(prev_idx[0])
+                    self._on_assignment_select(None)
                 self._refresh_progress_display()
 
             AccessibleButton(btn_frame, tts=self.tts, text="Mark Complete",
@@ -286,15 +518,29 @@ class LearnerView(tk.Frame):
                                 side="right", padx=5)
 
         AccessibleButton(btn_frame, tts=self.tts, text="Close",
-                         command=dlg.destroy).pack(side="right", padx=5)
+                         command=close_and_restore).pack(side="right", padx=5)
 
-        # Keyboard navigation for dialog
-        dlg.bind("<Escape>", lambda e: dlg.destroy())
+        def on_escape(event):
+            close_and_restore()
+            return "break"
+        dlg.bind("<Escape>", on_escape)
 
-        # Auto-read via TTS
+        # Auto-read via TTS: speak every content unit, not just the first.
         if self.tts and contents:
-            self.tts.speak(f"Opening course: {course.title}. "
-                           f"{contents[0].text_body}")
+            body = ". ".join(
+                f"{c.title}. {c.text_body}" for c in contents)
+            status = ("You have already completed this course. "
+                      if already_done else "")
+            buttons = ("Read Aloud, Stop Reading, and Close"
+                       if already_done
+                       else "Read Aloud, Stop Reading, Mark Complete, "
+                            "and Close")
+            self.tts.speak(
+                f"Opening course: {course.title}. "
+                f"{status}"
+                f"This course has {len(contents)} content "
+                f"{'unit' if len(contents) == 1 else 'units'}. {body} "
+                f"Tab through the {buttons} buttons to continue.")
 
     # ------------------------------------------------------------------ #
     # Tab 2: My Progress
@@ -306,12 +552,12 @@ class LearnerView(tk.Frame):
             "This tab shows your progress across all assigned learning paths. "
             "Each path displays how many courses you have completed. "
             "Press Tab to move between items. "
-            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
-            "Press Escape to return to the login screen."
+            "Press Tab or Shift Tab on the notebook to cycle tab labels. "
+            "Press Escape to go back: to the tab labels from inside the tab, or to the login screen from the tab labels."
         )
         self._refresh_progress_display()
 
-    def _refresh_progress_display(self, announce=False):
+    def _refresh_progress_display(self, announce=False, prefix=""):
         clear_frame(self.progress_tab)
         AccessibleLabel(self.progress_tab, text="Your Progress",
                         font=("Arial", 14, "bold")).pack(padx=10, pady=10)
@@ -321,7 +567,7 @@ class LearnerView(tk.Frame):
             AccessibleLabel(self.progress_tab,
                             text="No assignments yet.").pack(padx=10)
             if announce and self.tts:
-                self.tts.speak("You have no assignments yet.")
+                self.tts.speak(f"{prefix}You have no assignments yet.")
             return
 
         speech_parts = []
@@ -357,8 +603,7 @@ class LearnerView(tk.Frame):
                     f"{percent} percent complete.")
 
         if announce and self.tts:
-            summary = (f"Tab: My Progress. "
-                       f"You have {len(assignments)} assigned "
+            summary = (f"{prefix}You have {len(assignments)} assigned "
                        f"{'path' if len(assignments) == 1 else 'paths'}. ")
             summary += " ".join(speech_parts)
             self.tts.speak(summary)
@@ -371,11 +616,12 @@ class LearnerView(tk.Frame):
         notebook.add(tab, text="STEM Careers")
         self._tab_help[str(tab)] = (
             "On the left is a list of STEM career fields. "
-            "Use arrow keys to browse careers, and press Enter to select one. "
-            "The career details appear on the right. "
+            "Press Tab or Down arrow to walk through the careers, then "
+            "press Enter to load the highlighted career's details on the "
+            "right. "
             "Tab to the Read Aloud button to hear the career information. "
-            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
-            "Press Escape to return to the login screen."
+            "Press Tab or Shift Tab on the notebook to cycle tab labels. "
+            "Press Escape to go back: to the tab labels from inside the tab, or to the login screen from the tab labels."
         )
 
         left = tk.Frame(tab)
@@ -383,11 +629,12 @@ class LearnerView(tk.Frame):
 
         AccessibleLabel(left, text="Career Fields",
                         font=("Arial", 12, "bold")).pack()
-        self.career_listbox = AccessibleListbox(left, tts=self.tts,
-                                                height=12, width=25)
+        self.career_listbox = AccessibleListbox(
+            left, tts=self.tts,
+            item_noun="Career Field",
+            on_activate=self._on_career_select,
+            height=12, width=25)
         self.career_listbox.pack(fill="y", expand=True, pady=5)
-        self.career_listbox.bind("<<ListboxSelect>>", self._on_career_select)
-        self.career_listbox.bind("<Return>", self._on_career_select)
 
         for field in CAREER_PATHS:
             self.career_listbox.insert(tk.END, field)
@@ -405,6 +652,8 @@ class LearnerView(tk.Frame):
         AccessibleButton(btn_frame, tts=self.tts, text="Read Aloud",
                          command=self._read_career_aloud).pack(side="left",
                                                                 padx=5)
+
+        self._bind_escape_to_notebook(tab)
 
     def _on_career_select(self, event):
         sel = self.career_listbox.curselection()
@@ -430,18 +679,19 @@ class LearnerView(tk.Frame):
         notebook.add(tab, text="Opportunities")
         self._tab_help[str(tab)] = (
             "This tab lists available internship and academic opportunities. "
-            "Use arrow keys to browse the list. "
-            "Select an opportunity to see its description below. "
+            "Press Tab or Down arrow to walk through the list, then press "
+            "Enter to load the highlighted opportunity's description below. "
             "Tab to the Read Aloud button to hear the details. "
-            "Press Control Tab to go to the next tab, or Control Shift Tab to go to the previous tab. "
-            "Press Escape to return to the login screen."
+            "Press Tab or Shift Tab on the notebook to cycle tab labels. "
+            "Press Escape to go back: to the tab labels from inside the tab, or to the login screen from the tab labels."
         )
 
-        self.opp_listbox = AccessibleListbox(tab, tts=self.tts,
-                                             height=8, width=60)
+        self.opp_listbox = AccessibleListbox(
+            tab, tts=self.tts,
+            item_noun="Opportunity",
+            on_activate=self._on_opp_select,
+            height=8, width=60)
         self.opp_listbox.pack(fill="both", expand=True, padx=10, pady=10)
-        self.opp_listbox.bind("<<ListboxSelect>>", self._on_opp_select)
-        self.opp_listbox.bind("<Return>", self._on_opp_select)
 
         self.opp_detail = AccessibleLabel(tab, text="", wraplength=500,
                                           justify="left")
@@ -455,6 +705,8 @@ class LearnerView(tk.Frame):
             self.opp_listbox.insert(tk.END,
                                     f"[{o.opp_type.upper()}] {o.title}")
         self._opp_list = opps
+
+        self._bind_escape_to_notebook(tab)
 
     def _on_opp_select(self, event):
         sel = self.opp_listbox.curselection()
@@ -482,13 +734,25 @@ class LearnerView(tk.Frame):
         base = f"You are on the Learner Dashboard, {tab_name} tab. "
         return base + self._tab_help.get(tab_id, (
             "Press Tab to move between controls. "
-            "Press Escape to return to the login screen."
+            "Press Escape to go back: to the tab labels from inside the tab, or to the login screen from the tab labels."
         ))
 
     def _show_settings(self):
+        # Remember which widget had focus so we can restore it on close.
+        previous_focus = self.focus_get()
+
+        def close_and_restore():
+            dlg.destroy()
+            if previous_focus is not None:
+                try:
+                    previous_focus.focus_set()
+                except tk.TclError:
+                    pass
+
         dlg = tk.Toplevel(self)
         dlg.title("Accessibility Settings")
         dlg.grab_set()
+        dlg.focus_set()
         self.ctx.accessibility.apply_theme(dlg)
 
         prefs = self.user.accessibility_prefs
@@ -497,12 +761,15 @@ class LearnerView(tk.Frame):
         contrast_var = tk.BooleanVar(value=prefs.get("high_contrast", False))
         large_var = tk.BooleanVar(value=prefs.get("large_text", False))
 
-        tk.Checkbutton(dlg, text="Audio (TTS)",
-                       variable=audio_var).pack(anchor="w", padx=20, pady=5)
-        tk.Checkbutton(dlg, text="High Contrast",
-                       variable=contrast_var).pack(anchor="w", padx=20, pady=5)
-        tk.Checkbutton(dlg, text="Large Text",
-                       variable=large_var).pack(anchor="w", padx=20, pady=5)
+        AccessibleCheckbutton(dlg, tts=self.tts, text="Audio (TTS)",
+                              variable=audio_var).pack(
+                                  anchor="w", padx=20, pady=5)
+        AccessibleCheckbutton(dlg, tts=self.tts, text="High Contrast",
+                              variable=contrast_var).pack(
+                                  anchor="w", padx=20, pady=5)
+        AccessibleCheckbutton(dlg, tts=self.tts, text="Large Text",
+                              variable=large_var).pack(
+                                  anchor="w", padx=20, pady=5)
 
         AccessibleLabel(dlg, text="STEM Interests:",
                         font=("Arial", 11, "bold")).pack(
@@ -510,8 +777,8 @@ class LearnerView(tk.Frame):
         interest_vars = {}
         for field in STEM_FIELDS:
             var = tk.BooleanVar(value=(field in self.user.stem_interests))
-            tk.Checkbutton(dlg, text=field,
-                           variable=var).pack(anchor="w", padx=30)
+            AccessibleCheckbutton(dlg, tts=self.tts, text=field,
+                                  variable=var).pack(anchor="w", padx=30)
             interest_vars[field] = var
 
         def save():
@@ -527,14 +794,36 @@ class LearnerView(tk.Frame):
             self.ctrl.update_stem_interests(self.user.user_id, new_interests)
             self.user.stem_interests = new_interests
 
-            # Apply accessibility changes
             self.ctx.accessibility.update_from_prefs(new_prefs)
-            self.tts.enabled = self.ctx.accessibility.audio_enabled
             self.ctx.accessibility.apply_theme(self.ctx.root)
 
-            dlg.destroy()
-            if self.tts:
-                self.tts.speak("Settings saved.")
+            # Queue the confirmation before flipping tts.enabled — the
+            # utterance is buffered at the engine level so it still plays
+            # even if the user just disabled audio.
+            self.tts.enabled = True
+            self.tts.speak("Settings saved.")
+            self.tts.enabled = self.ctx.accessibility.audio_enabled
+
+            close_and_restore()
 
         AccessibleButton(dlg, tts=self.tts, text="Save",
                          command=save).pack(pady=10)
+
+        def on_escape(event):
+            close_and_restore()
+            return "break"
+        dlg.bind("<Escape>", on_escape)
+
+        # Announce the dialog's purpose and current state on open.
+        if self.tts:
+            def state(on):
+                return "on" if on else "off"
+            self.tts.speak(
+                "Accessibility Settings dialog. "
+                "Press Tab to move between options, Space to toggle the "
+                "focused checkbox, and Tab to the Save button and press "
+                "Enter to save. Press Escape to cancel. "
+                f"Audio is currently {state(audio_var.get())}. "
+                f"High Contrast is currently {state(contrast_var.get())}. "
+                f"Large Text is currently {state(large_var.get())}. "
+                "Below are checkboxes for your STEM interests.")

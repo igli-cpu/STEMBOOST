@@ -53,9 +53,11 @@ class EducatorView(tk.Frame):
         path_frame.pack(side="left", fill="both", expand=True, padx=5)
 
         self.path_listbox = AccessibleListbox(path_frame, tts=self.tts,
+                                              item_noun="Learning Path",
                                               height=15, width=30)
         self.path_listbox.pack(fill="both", expand=True)
-        self.path_listbox.bind("<<ListboxSelect>>", self._on_path_select)
+        self.path_listbox.bind("<<ListboxSelect>>", self._on_path_select,
+                               add="+")
 
         btn_row = tk.Frame(path_frame)
         btn_row.pack(fill="x", pady=5)
@@ -71,9 +73,11 @@ class EducatorView(tk.Frame):
         course_frame.pack(side="left", fill="both", expand=True, padx=5)
 
         self.course_listbox = AccessibleListbox(course_frame, tts=self.tts,
+                                                item_noun="Course",
                                                 height=15, width=30)
         self.course_listbox.pack(fill="both", expand=True)
-        self.course_listbox.bind("<<ListboxSelect>>", self._on_course_select)
+        self.course_listbox.bind("<<ListboxSelect>>", self._on_course_select,
+                                 add="+")
 
         btn_row2 = tk.Frame(course_frame)
         btn_row2.pack(fill="x", pady=5)
@@ -89,6 +93,7 @@ class EducatorView(tk.Frame):
         content_frame.pack(side="left", fill="both", expand=True, padx=5)
 
         self.content_listbox = AccessibleListbox(content_frame, tts=self.tts,
+                                                 item_noun="Content",
                                                  height=15, width=30)
         self.content_listbox.pack(fill="both", expand=True)
 

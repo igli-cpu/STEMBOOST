@@ -7,11 +7,18 @@ class TTSFacade:
     Provides a simplified interface (speak, stop, set_rate) and adapts the
     pyttsx3 engine to our application's needs. Uses the Singleton pattern
     so one engine instance is shared across the entire app.
+
+    pyttsx3's SAPI5 backend on Windows is a COM STA component. Two things
+    follow: (1) the engine must be driven from the thread that called
+    pyttsx3.init(); (2) runAndWait() leaves the engine loop flag dirty on
+    subsequent calls, so repeated runAndWait is unreliable. We therefore
+    run the engine in continuous non-blocking mode (startLoop(False)) and
+    drive iterate() from Tk's event loop via after().
     """
 
     _instance = None
     _lock = threading.Lock()
-    _initializing = False  # Guard against direct instantiation
+    _initializing = False
 
     @classmethod
     def get_instance(cls):
@@ -31,50 +38,55 @@ class TTSFacade:
         self._engine = pyttsx3.init()
         self._engine.setProperty("rate", 175)
         self._engine.setProperty("volume", 1.0)
-        self._speaking = False
-        self._speech_lock = threading.Lock()
-        self._generation = 0        # incremented on every speak/stop
-        self._generation_lock = threading.Lock()
-        self.enabled = True  # Controls whether speak() actually produces audio
+        self._tk = None
+        self._loop_started = False
+        self.enabled = True
 
-    def speak(self, text):
-        """Speak text in a background thread so the GUI is not blocked.
+    def attach_to_root(self, root):
+        """Wire pyttsx3's iterate loop into Tk's event loop.
 
-        If a previous utterance is still playing or queued, it is
-        superseded: the engine is stopped and queued threads bail out
-        once they acquire the lock and notice a newer generation.
+        Must be called once, on the Tk main thread, before any speak()
+        calls that expect non-blocking behavior.
         """
-        if not text or not self.enabled:
+        self._tk = root
+        if not self._loop_started:
+            try:
+                self._engine.startLoop(False)
+                self._loop_started = True
+            except RuntimeError:
+                pass
+        self._schedule_iterate()
+
+    def _schedule_iterate(self):
+        if self._tk is None:
             return
-        with self._generation_lock:
-            self._generation += 1
-            gen = self._generation
         try:
-            self._engine.stop()
+            self._engine.iterate()
         except RuntimeError:
             pass
-        thread = threading.Thread(target=self._speak_blocking,
-                                  args=(text, gen), daemon=True)
-        thread.start()
+        self._tk.after(50, self._schedule_iterate)
 
-    def _speak_blocking(self, text, gen):
-        with self._speech_lock:
-            # Another speak() or stop() arrived while we waited — skip.
-            if gen != self._generation:
-                return
-            self._speaking = True
+    def speak(self, text):
+        """Queue text for speech. Returns immediately."""
+        if not text or not self.enabled:
+            return
+        if not self._loop_started:
             try:
                 self._engine.say(text)
                 self._engine.runAndWait()
             except RuntimeError:
                 pass
-            finally:
-                self._speaking = False
+            return
+        try:
+            self._engine.stop()
+        except RuntimeError:
+            pass
+        try:
+            self._engine.say(text)
+        except RuntimeError:
+            pass
 
     def stop(self):
-        """Cancel current and queued speech."""
-        with self._generation_lock:
-            self._generation += 1
         try:
             self._engine.stop()
         except RuntimeError:
@@ -88,4 +100,4 @@ class TTSFacade:
 
     @property
     def is_speaking(self):
-        return self._speaking
+        return False

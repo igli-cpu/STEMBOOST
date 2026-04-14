@@ -2,7 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from stemboost.views.widgets import (AccessibleButton, AccessibleLabel,
-                                     AccessibleEntry, clear_frame)
+                                     AccessibleEntry,
+                                     AccessibleCheckbutton, clear_frame)
 from stemboost.models.constants import STEM_FIELDS
 
 
@@ -55,10 +56,27 @@ class LoginView(tk.Frame):
                          fg="red").pack(pady=(20, 0))
 
         self.password_entry.bind("<Return>", lambda e: self._on_login())
+
+        # Suppress the first FocusIn announcement on username_entry so
+        # the welcome message plays uninterrupted. Subsequent FocusIns
+        # (tab back to the username field) still announce normally.
+        self._skip_initial_username_focus = True
+        original_username_focus = self.username_entry._on_focus
+
+        def wrapped_username_focus(event):
+            if self._skip_initial_username_focus:
+                self._skip_initial_username_focus = False
+                return
+            original_username_focus(event)
+
+        self.username_entry.bind("<FocusIn>", wrapped_username_focus)
         self.username_entry.focus_set()
+
         if self.tts:
-            self.tts.speak("Welcome to STEMBOOST. Please enter your username "
-                           "and password to login, or press Tab to register.")
+            self.tts.speak(
+                "Welcome to STEMBOOST. Please enter your username "
+                "and password to login, or press Tab to register. "
+                "The username field is active.")
 
     def _on_login(self):
         username = self.username_entry.get().strip()
@@ -156,12 +174,12 @@ class LoginView(tk.Frame):
         self.acc_audio = tk.BooleanVar(value=True)
         self.acc_contrast = tk.BooleanVar(value=False)
         self.acc_large = tk.BooleanVar(value=False)
-        tk.Checkbutton(acc_frame, text="Audio (TTS)",
-                       variable=self.acc_audio).pack(anchor="w")
-        tk.Checkbutton(acc_frame, text="High Contrast",
-                       variable=self.acc_contrast).pack(anchor="w")
-        tk.Checkbutton(acc_frame, text="Large Text",
-                       variable=self.acc_large).pack(anchor="w")
+        AccessibleCheckbutton(acc_frame, tts=self.tts, text="Audio (TTS)",
+                              variable=self.acc_audio).pack(anchor="w")
+        AccessibleCheckbutton(acc_frame, tts=self.tts, text="High Contrast",
+                              variable=self.acc_contrast).pack(anchor="w")
+        AccessibleCheckbutton(acc_frame, tts=self.tts, text="Large Text",
+                              variable=self.acc_large).pack(anchor="w")
 
         AccessibleLabel(self.learner_frame,
                         text="STEM Interests:").grid(
@@ -171,8 +189,8 @@ class LoginView(tk.Frame):
         self.interest_vars = {}
         for field in STEM_FIELDS:
             var = tk.BooleanVar(value=False)
-            tk.Checkbutton(interest_frame, text=field,
-                           variable=var).pack(anchor="w")
+            AccessibleCheckbutton(interest_frame, tts=self.tts, text=field,
+                                  variable=var).pack(anchor="w")
             self.interest_vars[field] = var
 
     def _on_vision_type_change(self, event):
@@ -211,8 +229,8 @@ class LoginView(tk.Frame):
             self.expertise_vars = {}
             for field in STEM_FIELDS:
                 var = tk.BooleanVar(value=False)
-                tk.Checkbutton(exp_frame, text=field,
-                               variable=var).pack(anchor="w")
+                AccessibleCheckbutton(exp_frame, tts=self.tts, text=field,
+                                      variable=var).pack(anchor="w")
                 self.expertise_vars[field] = var
 
     def _on_register(self):
