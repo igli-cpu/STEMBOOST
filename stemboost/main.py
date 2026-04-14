@@ -86,12 +86,6 @@ class StemboostApp:
         self.root.bind_class("Listbox", "<F1>", lambda e: None)
         self.root.bind_all("<F1>", lambda e: self._announce_help())
 
-        # Allow Ctrl+Tab / Ctrl+Shift+Tab to propagate out of Listbox so
-        # that the ttk.Notebook widget-level bindings can switch tabs even
-        # when focus is inside a listbox inside a tab.
-        self.root.bind_class("Listbox", "<Control-Tab>", lambda e: None)
-        self.root.bind_class("Listbox", "<Control-Shift-Tab>", lambda e: None)
-
         # Start with login
         self.show_login()
 
