@@ -1,14 +1,47 @@
+import platform
 import queue
 import threading
 import time
 import urllib.request
 from pathlib import Path
 
-import numpy as np
-import sounddevice as sd
-from piper.voice import PiperVoice
+# ============================================================================
+# Utility / Checks
+# ============================================================================
 
-# Curated list of Piper voices.
+
+def _has_internet():
+    try:
+        urllib.request.urlopen("https://huggingface.co", timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+def _can_import_piper():
+    try:
+        import numpy
+        import sounddevice
+        from piper.voice import PiperVoice
+
+        return True
+    except ImportError:
+        return False
+
+
+def _can_import_pyttsx3():
+    try:
+        import pyttsx3
+
+        return True
+    except ImportError:
+        return False
+
+
+# ============================================================================
+# 1. Piper TTS Implementation
+# ============================================================================
+
 AVAILABLE_VOICES = {
     # --- US English (en_US) ---
     "amy": "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium",
@@ -44,7 +77,7 @@ AVAILABLE_VOICES = {
 }
 
 
-class TTSFacade:
+class _PiperTTSFacade:
     """Facade + Adapter over Piper High-Fidelity local neural TTS."""
 
     _instance = None
@@ -57,13 +90,19 @@ class TTSFacade:
             with cls._lock:
                 if cls._instance is None:
                     cls._initializing = True
-                    cls._instance = TTSFacade()
+                    cls._instance = cls()
                     cls._initializing = False
         return cls._instance
 
     def __init__(self):
-        if not TTSFacade._initializing:
-            raise RuntimeError("Use TTSFacade.get_instance() instead of TTSFacade()")
+        if not self._initializing:
+            raise RuntimeError("Use get_instance() instead of instantiation")
+
+        import numpy as np
+        import sounddevice as sd
+
+        self.np = np
+        self.sd = sd
 
         self.enabled = True
         self._queue = queue.Queue()
@@ -77,12 +116,10 @@ class TTSFacade:
         self._worker.start()
 
     def _ensure_model_exist(self, voice_id: str) -> Path:
-        """Downloads a Piper voice model using pathlib if it doesn't exist yet."""
         if voice_id not in AVAILABLE_VOICES:
             raise ValueError(f"Voice '{voice_id}' not found in AVAILABLE_VOICES.")
 
         base_url = AVAILABLE_VOICES[voice_id]
-
         model_dir = Path("models/piper-tts")
         model_dir.mkdir(parents=True, exist_ok=True)
 
@@ -101,7 +138,8 @@ class TTSFacade:
         return model_path
 
     def _tts_worker(self):
-        """Runs continuously in the background, generating and playing audio."""
+        from piper.voice import PiperVoice
+
         try:
             active_voice_id = self._current_voice_id
             model_path = self._ensure_model_exist(active_voice_id)
@@ -137,19 +175,21 @@ class TTSFacade:
                             continue
 
                         audio_np = (
-                            np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32)
+                            self.np.frombuffer(raw_audio, dtype=self.np.int16).astype(
+                                self.np.float32
+                            )
                             / 32768.0
                         )
                         audio_np *= self._current_volume
 
-                        sd.play(audio_np, sample_rate)
+                        self.sd.play(audio_np, sample_rate)
 
                         duration = len(audio_np) / sample_rate
                         start_time = time.time()
 
                         while time.time() - start_time < duration:
                             if self._abort_current:
-                                sd.stop()
+                                self.sd.stop()
                                 break
                             time.sleep(0.05)
 
@@ -169,7 +209,6 @@ class TTSFacade:
                     if new_voice_id != active_voice_id:
                         print(f"[TTS] Swapping voice to '{new_voice_id}'...")
                         try:
-                            # Swap the engine on the fly
                             model_path = self._ensure_model_exist(new_voice_id)
                             voice = PiperVoice.load(str(model_path))
                             sample_rate = voice.config.sample_rate
@@ -186,7 +225,6 @@ class TTSFacade:
         pass
 
     def _clear_queue(self):
-        """Safely empties the queue."""
         while True:
             try:
                 self._queue.get_nowait()
@@ -196,7 +234,6 @@ class TTSFacade:
     def speak(self, text):
         if not text or not self.enabled or not str(text).strip():
             return
-
         self._abort_current = True
         self._clear_queue()
         self._queue.put(("SPEAK", text))
@@ -207,15 +244,10 @@ class TTSFacade:
         self._queue.put(("STOP", None))
 
     def set_volume(self, volume):
-        """Sets playback volume (0.0 to 1.0)."""
         self._current_volume = max(0.0, min(volume, 1.0))
         self._queue.put(("VOLUME", self._current_volume))
 
     def set_voice(self, voice_id):
-        """
-        Changes the current voice.
-        Valid options: see AVAILABLE_VOICES
-        """
         if voice_id in AVAILABLE_VOICES:
             self._queue.put(("VOICE", voice_id))
         else:
@@ -224,3 +256,234 @@ class TTSFacade:
     @property
     def is_speaking(self):
         return self._is_speaking_state
+
+
+# ============================================================================
+# 2. Windows pyttsx3 Implementation
+# ============================================================================
+
+
+class _WindowsPyTTSFacade:
+    """Facade + Adapter over pyttsx3 for text-to-speech (Windows SAPI5)."""
+
+    _instance = None
+    _lock = threading.Lock()
+    _initializing = False
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._initializing = True
+                    cls._instance = cls()
+                    cls._initializing = False
+        return cls._instance
+
+    def __init__(self):
+        if not self._initializing:
+            raise RuntimeError("Use get_instance() instead of instantiation")
+        import pyttsx3
+
+        self._engine = pyttsx3.init()
+        self._engine.setProperty("rate", 175)
+        self._engine.setProperty("volume", 1.0)
+        self._tk = None
+        self._loop_started = False
+        self.enabled = True
+
+    def attach_to_root(self, root):
+        self._tk = root
+        if not self._loop_started:
+            try:
+                self._engine.startLoop(False)
+                self._loop_started = True
+            except RuntimeError:
+                pass
+        self._schedule_iterate()
+
+    def _schedule_iterate(self):
+        if self._tk is None:
+            return
+        try:
+            self._engine.iterate()
+        except RuntimeError:
+            pass
+        self._tk.after(50, self._schedule_iterate)
+
+    def speak(self, text):
+        if not text or not self.enabled:
+            return
+        if not self._loop_started:
+            try:
+                self._engine.say(text)
+                self._engine.runAndWait()
+            except RuntimeError:
+                pass
+            return
+        try:
+            self._engine.stop()
+        except RuntimeError:
+            pass
+        try:
+            self._engine.say(text)
+        except RuntimeError:
+            pass
+
+    def stop(self):
+        try:
+            self._engine.stop()
+        except RuntimeError:
+            pass
+
+    def set_rate(self, rate):
+        self._engine.setProperty("rate", rate)
+
+    def set_volume(self, volume):
+        self._engine.setProperty("volume", volume)
+
+    @property
+    def is_speaking(self):
+        return False
+
+
+# ============================================================================
+# 3. Posix pyttsx3 Implementation
+# ============================================================================
+
+
+# hopefully this works on MacOS as well?
+class _PosixPyTTSFacade:
+    """Facade + Adapter over pyttsx3 for text-to-speech (ponix)."""
+
+    _instance = None
+    _lock = threading.Lock()
+    _initializing = False
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._initializing = True
+                    cls._instance = cls()
+                    cls._initializing = False
+        return cls._instance
+
+    def __init__(self):
+        if not self._initializing:
+            raise RuntimeError("Use get_instance() instead of instantiation")
+
+        self.enabled = True
+        self._queue = queue.Queue()
+        self._is_speaking_state = False
+
+        self._current_rate = 175
+        self._current_volume = 1.0
+
+        self._worker = threading.Thread(target=self._tts_worker, daemon=True)
+        self._worker.start()
+
+    def _tts_worker(self):
+        import pyttsx3
+
+        engine = pyttsx3.init()
+        engine.setProperty("rate", self._current_rate)
+        engine.setProperty("volume", self._current_volume)
+
+        def on_start(name):
+            self._is_speaking_state = True
+
+        def on_finish(name, completed):
+            self._is_speaking_state = False
+
+        engine.connect("started-utterance", on_start)
+        engine.connect("finished-utterance", on_finish)
+
+        while True:
+            command, payload = self._queue.get()
+
+            if command == "SPEAK":
+                try:
+                    engine.say(payload)
+                    engine.runAndWait()
+                except RuntimeError:
+                    pass
+            elif command == "STOP":
+                try:
+                    engine.stop()
+                except RuntimeError:
+                    pass
+            elif command == "RATE":
+                engine.setProperty("rate", payload)
+            elif command == "VOLUME":
+                engine.setProperty("volume", payload)
+
+            self._queue.task_done()
+
+    def attach_to_root(self, root):
+        pass
+
+    def _clear_queue(self):
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+                self._queue.task_done()
+            except queue.Empty:
+                break
+
+    def speak(self, text):
+        if not text or not self.enabled:
+            return
+        self._clear_queue()
+        self._queue.put(("STOP", None))
+        self._queue.put(("SPEAK", text))
+
+    def stop(self):
+        self._clear_queue()
+        self._queue.put(("STOP", None))
+
+    def set_rate(self, rate):
+        self._current_rate = rate
+        self._queue.put(("RATE", rate))
+
+    def set_volume(self, volume):
+        self._current_volume = volume
+        self._queue.put(("VOLUME", volume))
+
+    @property
+    def is_speaking(self):
+        return self._is_speaking_state
+
+
+# ============================================================================
+# Logic Router / Exporter
+# ============================================================================
+
+
+def _select_tts_backend():
+    if _can_import_piper():
+        model_dir = Path("models/piper-tts")
+        has_models = model_dir.exists() and any(model_dir.glob("*.onnx"))
+
+        if has_models or _has_internet():
+            print("[TTS Router] Initializing Piper-TTS Backend...")
+            return _PiperTTSFacade
+
+    if _can_import_pyttsx3():
+        system = platform.system()
+        if system == "Windows":
+            print("[TTS Router] Initializing Windows pyttsx3 Backend...")
+            return _WindowsPyTTSFacade
+        else:
+            print("[TTS Router] Initializing Posix pyttsx3 Backend...")
+            return _PosixPyTTSFacade
+
+    raise ImportError(
+        "No suitable TTS engine found!\n"
+        "-> For piper TTS, run: 'uv sync' or 'pip install piper-tts numpy sounddevice'\n"
+        "-> For standard fallback TTS, run: 'uv sync --extra pytts' or 'pip install pyttsx3'"
+    )
+
+
+TTSFacade = _select_tts_backend()

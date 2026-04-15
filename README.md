@@ -42,7 +42,7 @@ STEMBOOST/
       learner_controller.py   # Content consumption, progress tracking
     services/
       data_service.py         # Facade over all repositories; owns the DB connection
-      tts_service.py          # Singleton text-to-speech facade wrapping piper-tts
+      tts_service.py          # Singleton text-to-speech facade wrapping both piper-tts and pytts
       accessibility_service.py # Theme management (contrast, text size)
       observer.py             # Observer pattern for progress notifications
     repositories/
@@ -78,8 +78,9 @@ STEMBOOST/
 ## Prerequisites
 
 - Python 3.12 or later
-- piper-tts (and its system dependencies for TTS playback)
+- piper-tts or pytts
 - Tkinter (included with standard Python installations on most platforms)
+
 
 ## Installation
 
@@ -89,11 +90,16 @@ Using pip:
 pip install -r requirements.txt
 ```
 
-Using uv (from the `stemboost/` subdirectory):
+Using uv
+
 
 ```bash
-cd stemboost
 uv sync
+```
+
+Optional pytts packages (by default we have everything for piper-tts)
+```
+uv sync --extra pytts
 ```
 
 ## Running the Application
