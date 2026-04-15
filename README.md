@@ -17,7 +17,7 @@ Progress is tracked as courses consumed out of total courses assigned (e.g. 3 ou
 - **Language:** Python 3.10+
 - **GUI Framework:** Tkinter
 - **Database:** SQLite (file-based, stored at `stemboost/data/stemboost.db`)
-- **Text-to-Speech:** pyttsx3
+- **Text-to-Speech:** piper-tts
 - **Package Manager:** uv (or pip)
 
 ## Project Structure
@@ -42,7 +42,7 @@ STEMBOOST/
       learner_controller.py   # Content consumption, progress tracking
     services/
       data_service.py         # Facade over all repositories; owns the DB connection
-      tts_service.py          # Singleton text-to-speech facade wrapping pyttsx3
+      tts_service.py          # Singleton text-to-speech facade wrapping piper-tts
       accessibility_service.py # Theme management (contrast, text size)
       observer.py             # Observer pattern for progress notifications
     repositories/
@@ -70,15 +70,15 @@ STEMBOOST/
 
 - **MVC** -- Models define domain objects, controllers contain business logic, views handle the Tkinter GUI, and services/repositories manage persistence.
 - **Factory** -- `UserFactory` constructs the correct `User` subclass (`Educator`, `Mentor`, or `Learner`) from a role string or database row.
-- **Singleton** -- `TTSFacade` ensures a single pyttsx3 engine instance is shared across the application.
+- **Singleton** -- `TTSFacade` ensures a single piper-tts engine instance is shared across the application.
 - **Observer** -- `ProgressSubject`/`ProgressObserver` notifies the learner view when course completion status changes.
 - **Facade** -- `DataService` provides a single entry point to the data layer, delegating to individual repository classes.
 - **Repository** -- Each database table has a dedicated repository class responsible for its SQL operations.
 
 ## Prerequisites
 
-- Python 3.10 or later
-- pyttsx3 (and its system dependencies for TTS playback)
+- Python 3.12 or later
+- piper-tts (and its system dependencies for TTS playback)
 - Tkinter (included with standard Python installations on most platforms)
 
 ## Installation

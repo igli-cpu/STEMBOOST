@@ -174,7 +174,7 @@ class TTSFacade:
                             voice = PiperVoice.load(str(model_path))
                             sample_rate = voice.config.sample_rate
                             active_voice_id = new_voice_id
-                            print(f"[TTS] Voice swapped successfully.")
+                            print("[TTS] Voice swapped successfully.")
                         except Exception as e:
                             print(f"[TTS Error swapping voice]: {e}")
 
@@ -214,7 +214,7 @@ class TTSFacade:
     def set_voice(self, voice_id):
         """
         Changes the current voice.
-        Valid options: 'lessac', 'ryan', 'alba', 'cori', 'arctic'.
+        Valid options: see AVAILABLE_VOICES
         """
         if voice_id in AVAILABLE_VOICES:
             self._queue.put(("VOICE", voice_id))
