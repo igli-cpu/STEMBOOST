@@ -36,7 +36,7 @@ class StemboostApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("STEMBOOST")
-        self.root.geometry("1000x700")
+        self.root.geometry("1920x1200")
         self.root.minsize(800, 600)
 
         # Services
