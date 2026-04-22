@@ -551,11 +551,59 @@ class LearnerView(tk.Frame):
         self._tab_help[str(self.progress_tab)] = (
             "This tab shows your progress across all assigned learning paths. "
             "Each path displays how many courses you have completed. "
-            "Press Tab to move between items. "
+            "Press Tab or Down arrow to walk through paths and hear each path's progress. "
+            "Tab to the Read Aloud button to hear the full progress summary, "
+            "or the Stop Reading button to interrupt playback. "
             "Press Tab or Shift Tab on the notebook to cycle tab labels. "
             "Press Escape to go back: to the tab labels from inside the tab, or to the login screen from the tab labels."
         )
+        self._progress_summary = ""
         self._refresh_progress_display()
+
+    def _build_progress_speech(self, assignments):
+        """Return (full_summary, per_row_texts) for the given assignments.
+
+        `full_summary` is the spoken summary across all assignments.
+        `per_row_texts[i]` is what to announce when row i receives focus.
+        Kept separate from rendering so tests can verify the speech text
+        without constructing a Tk UI.
+        """
+        if not assignments:
+            return "You have no assignments yet.", []
+
+        per_row = []
+        speech_parts = []
+        for a in assignments:
+            path = self.ctrl.get_path_info(a.path_id)
+            completed, total = self.ctrl.get_progress(a.assignment_id)
+            name = path.title if path else f"Path {a.path_id}"
+
+            if completed == total and total > 0:
+                row_text = (
+                    f"{name}: path complete. "
+                    f"All {total} courses consumed.")
+            else:
+                percent = int((completed / total) * 100) if total > 0 else 0
+                row_text = (
+                    f"{name}: {completed} out of {total} courses consumed, "
+                    f"{percent} percent complete.")
+            per_row.append(row_text)
+            speech_parts.append(row_text)
+
+        summary = (f"You have {len(assignments)} assigned "
+                   f"{'path' if len(assignments) == 1 else 'paths'}. ")
+        summary += " ".join(speech_parts)
+        return summary, per_row
+
+    def _read_progress_aloud(self):
+        """Speak the cached progress summary from the top."""
+        if self.tts and self._progress_summary:
+            self.tts.stop()
+            self.tts.speak(self._progress_summary)
+
+    def _stop_progress_reading(self):
+        if self.tts:
+            self.tts.stop()
 
     def _refresh_progress_display(self, announce=False, prefix=""):
         clear_frame(self.progress_tab)
@@ -563,15 +611,17 @@ class LearnerView(tk.Frame):
                         font=("Arial", 14, "bold")).pack(padx=10, pady=10)
 
         assignments = self.ctrl.get_my_assignments(self.user.user_id)
+        summary, per_row_texts = self._build_progress_speech(assignments)
+        self._progress_summary = summary
+
         if not assignments:
             AccessibleLabel(self.progress_tab,
                             text="No assignments yet.").pack(padx=10)
             if announce and self.tts:
-                self.tts.speak(f"{prefix}You have no assignments yet.")
+                self.tts.speak(f"{prefix}{summary}")
             return
 
-        speech_parts = []
-        for a in assignments:
+        for a, row_text in zip(assignments, per_row_texts):
             path = self.ctrl.get_path_info(a.path_id)
             completed, total = self.ctrl.get_progress(a.assignment_id)
             name = path.title if path else f"Path {a.path_id}"
@@ -579,12 +629,11 @@ class LearnerView(tk.Frame):
             row = tk.Frame(self.progress_tab)
             row.pack(fill="x", padx=10, pady=5)
 
-            AccessibleLabel(row, text=f"{name}:",
+            # Focusable label announces the full row's progress on focus so
+            # keyboard users can Tab through paths and hear each status.
+            AccessibleLabel(row, tts=self.tts, announce=True,
+                            text=row_text, justify="left",
                             font=("Arial", 11, "bold")).pack(side="left")
-            AccessibleLabel(
-                row,
-                text=f"  {completed} out of {total} courses consumed").pack(
-                    side="left")
 
             bar = ttk.Progressbar(row, length=200, maximum=max(total, 1),
                                   value=completed)
@@ -594,19 +643,23 @@ class LearnerView(tk.Frame):
                 AccessibleLabel(row, text="PATH COMPLETE",
                                 fg="green",
                                 font=("Arial", 10, "bold")).pack(side="left")
-                speech_parts.append(
-                    f"{name}: completed! All {total} courses consumed.")
-            else:
-                percent = int((completed / total) * 100) if total > 0 else 0
-                speech_parts.append(
-                    f"{name}: {completed} out of {total} courses consumed, "
-                    f"{percent} percent complete.")
+
+        # Read Aloud / Stop Reading controls — mirrors the pattern used by
+        # the Careers and Opportunities tabs so TTS is available on demand.
+        btn_frame = tk.Frame(self.progress_tab)
+        btn_frame.pack(pady=10)
+        AccessibleButton(btn_frame, tts=self.tts, text="Read Aloud",
+                         command=self._read_progress_aloud).pack(
+                             side="left", padx=5)
+        AccessibleButton(btn_frame, tts=self.tts, text="Stop Reading",
+                         command=self._stop_progress_reading).pack(
+                             side="left", padx=5)
+
+        # Re-bind Escape since we've rebuilt the tab's subtree.
+        self._bind_escape_to_notebook(self.progress_tab)
 
         if announce and self.tts:
-            summary = (f"{prefix}You have {len(assignments)} assigned "
-                       f"{'path' if len(assignments) == 1 else 'paths'}. ")
-            summary += " ".join(speech_parts)
-            self.tts.speak(summary)
+            self.tts.speak(f"{prefix}{summary}")
 
     # ------------------------------------------------------------------ #
     # Tab 3: STEM Careers
@@ -665,6 +718,8 @@ class LearnerView(tk.Frame):
         self.career_text.delete("1.0", tk.END)
         self.career_text.insert("1.0", info)
         self.career_text.configure(state="disabled")
+        if self.tts:
+            self.tts.speak(f"{field}. {info}")
 
     def _read_career_aloud(self):
         text = self.career_text.get("1.0", tk.END).strip()
@@ -714,6 +769,8 @@ class LearnerView(tk.Frame):
             return
         opp = self._opp_list[sel[0]]
         self.opp_detail.configure(text=opp.description)
+        if self.tts:
+            self.tts.speak(f"{opp.title}. {opp.description}")
 
     def _read_opp_aloud(self):
         text = self.opp_detail.cget("text")
