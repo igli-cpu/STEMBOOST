@@ -1,0 +1,85 @@
+<mxfile host="65bd71144e">
+    <diagram id="mentor-use-case" name="Mentor Use Case">
+        <mxGraphModel dx="1099" dy="861" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="850" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="STEMBOOST - Mentor Features" style="swimlane;whiteSpace=wrap;html=1;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="295" y="50" width="385" height="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="Log In" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="70" y="40" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="Browse Learning Paths" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="60" y="110" width="100" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="View Courses in Selected Path" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="240" y="110" width="130" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="Assign Learning Path to Learner" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="55" y="230" width="110" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="Optionally Exclude Courses" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="265" y="230" width="90" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" value="Register New Learner" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="70" y="450" width="80" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="View My Learners" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="75" y="330" width="70" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" value="Monitor Learner Progress" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="260" y="375" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" value="Post Internship / Academic Opportunity" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="50" y="600" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="View Posted Opportunities" style="ellipse;whiteSpace=wrap;html=1;" parent="2" vertex="1">
+                    <mxGeometry x="55" y="530" width="110" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="110" value="" style="endArrow=open;dashed=1;html=1;" parent="2" source="11" target="12" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="111" value="" style="endArrow=open;dashed=1;html=1;" parent="2" source="13" target="11" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="112" value="" style="endArrow=open;dashed=1;html=1;" parent="2" source="13" target="16" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="113" value="" style="endArrow=open;dashed=1;html=1;" parent="2" source="14" target="13" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="114" value="" style="endArrow=open;dashed=1;html=1;" parent="2" source="17" target="16" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="Mentor" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="450" width="60" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="100" value="" style="edgeStyle=none;html=1;endArrow=none;endFill=0;" parent="1" source="3" target="10" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="101" value="" style="edgeStyle=none;html=1;endArrow=none;endFill=0;" parent="1" source="3" target="11" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="102" value="" style="edgeStyle=none;html=1;endArrow=none;endFill=0;" parent="1" source="3" target="13" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="103" value="" style="edgeStyle=none;html=1;endArrow=none;endFill=0;" parent="1" source="3" target="15" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="104" value="" style="edgeStyle=none;html=1;endArrow=none;endFill=0;" parent="1" source="3" target="16" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="105" value="" style="edgeStyle=none;html=1;endArrow=none;endFill=0;" parent="1" source="3" target="17" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="106" value="" style="edgeStyle=none;html=1;endArrow=none;endFill=0;" parent="1" source="3" target="18" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="107" value="" style="edgeStyle=none;html=1;endArrow=none;endFill=0;" parent="1" source="3" target="19" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
