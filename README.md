@@ -14,10 +14,10 @@ Progress is tracked as courses consumed out of total courses assigned (e.g. 3 ou
 
 ## Technology Stack
 
-- **Language:** Python 3.10+
+- **Language:** Python 3.12+
 - **GUI Framework:** Tkinter
 - **Database:** SQLite (file-based, stored at `stemboost/data/stemboost.db`)
-- **Text-to-Speech:** piper-tts
+- **Text-to-Speech:** piper-tts (primary, neural TTS) with pyttsx3 fallback
 - **Package Manager:** uv (or pip)
 
 ## Project Structure
@@ -42,8 +42,9 @@ STEMBOOST/
       learner_controller.py   # Content consumption, progress tracking
     services/
       data_service.py         # Facade over all repositories; owns the DB connection
-      tts_service.py          # Singleton text-to-speech facade wrapping both piper-tts and pytts
+      tts_service.py          # TTS backend router: selects piper-tts or pyttsx3 at startup
       accessibility_service.py # Theme management (contrast, text size)
+      interfaces.py           # Protocol definitions for DIP (controllers depend on these)
       observer.py             # Observer pattern for progress notifications
     repositories/
       user_repository.py      # User table CRUD and authentication
@@ -58,49 +59,89 @@ STEMBOOST/
       educator_view.py        # Educator dashboard (3-column path/course/content manager)
       mentor_view.py          # Mentor dashboard (tabbed: browse/assign, learners, opportunities)
       learner_view.py         # Learner dashboard (tabbed: assignments, progress, careers, opportunities)
+      hotkeys.py              # Command pattern: HotkeyRegistry wires global key bindings
+      view_context.py         # ViewContext dataclass passed to all views (decouples from StemboostApp)
       widgets.py              # Accessible widget subclasses (buttons, labels, entries, listboxes)
     data/
       seed_data.py            # Demo data loader (sample users, paths, courses, assignments)
       stemboost.db            # SQLite database file (auto-created on first run)
-  requirements.txt
-  Feedback.md                 # OOP design review and SOLID analysis
+  tests/
+    conftest.py               # Shared fixtures: in-memory DataService, SpyTTS test double, seeded scenario
+    test_learner_requirements.py
+    test_mentor_educator_requirements.py
+    test_progress_tts.py
+    test_system_requirements.py
+  docs/
+    ai_uc1.drawio             # Use-case diagram (source)
+    ai_uc1.png                # Use-case diagram (rendered)
+    ai_uc2.png                # Use-case diagram 2 (rendered)
+    general_uc.drawio         # Use-case diagram (source)
+  pyproject.toml
+  requirements.txt            # Legacy pip file (prefer pyproject.toml)
 ```
 
 ## Design Patterns Used
 
 - **MVC** -- Models define domain objects, controllers contain business logic, views handle the Tkinter GUI, and services/repositories manage persistence.
 - **Factory** -- `UserFactory` constructs the correct `User` subclass (`Educator`, `Mentor`, or `Learner`) from a role string or database row.
-- **Singleton** -- `TTSFacade` ensures a single piper-tts engine instance is shared across the application.
+- **Singleton** -- Each TTS backend class uses a `get_instance()` class method so only one engine instance exists per process.
 - **Observer** -- `ProgressSubject`/`ProgressObserver` notifies the learner view when course completion status changes.
-- **Facade** -- `DataService` provides a single entry point to the data layer, delegating to individual repository classes.
+- **Facade** -- `DataService` provides a single entry point to the data layer, delegating to individual repository classes. `TTSFacade` (module-level alias) hides which backend is active.
 - **Repository** -- Each database table has a dedicated repository class responsible for its SQL operations.
+- **Command** -- `HotkeyRegistry` in `hotkeys.py` encapsulates each key binding as a `Hotkey` dataclass (key sequences + description + action + guard), decoupling key registration from `StemboostApp`.
+- **Protocol / Dependency Inversion** -- `services/interfaces.py` defines `DataServiceProtocol` so controllers depend on an abstract interface rather than the concrete `DataService` implementation.
 
 ## Prerequisites
 
 - Python 3.12 or later
-- piper-tts or pytts
 - Tkinter (included with standard Python installations on most platforms)
-
+- For piper-tts (default): internet access on first run to download the voice model (~50 MB to `models/piper-tts/`), or pre-downloaded model files already present in that directory
+- For pyttsx3 fallback (optional): see *Optional pytts packages* below
 
 ## Installation
 
-Using pip:
-
-```bash
-pip install -r requirements.txt
-```
-
-Using uv
-
+### Using uv (recommended)
 
 ```bash
 uv sync
 ```
 
-Optional pytts packages (by default we have everything for piper-tts)
+### Using pip
+
+```bash
+pip install piper-tts numpy sounddevice
 ```
+
+### Optional pytts packages
+
+Install `pyttsx3` as a fallback TTS engine (used automatically when piper-tts is unavailable):
+
+```bash
+# uv
 uv sync --extra pytts
+
+# pip
+pip install pyttsx3
 ```
+
+### Test dependencies
+
+```bash
+# uv
+uv sync --extra test
+
+# pip
+pip install pytest
+```
+
+## Text-to-Speech Backend Selection
+
+At startup, the application automatically selects the best available TTS engine:
+
+1. **piper-tts** (neural, high-fidelity) -- used if `piper-tts`, `numpy`, and `sounddevice` are importable **and** either a pre-downloaded model exists in `models/piper-tts/` or the machine has internet access. The first run downloads the default voice (`hfc_female`, ~50 MB) from HuggingFace.
+2. **pyttsx3** (system TTS, lower fidelity) -- used as a fallback when piper-tts is unavailable. On Windows, SAPI5 is used; on macOS/Linux, the platform speech engine is used via the pyttsx3 driver.
+
+If neither engine can be loaded, the application raises an `ImportError` with installation instructions.
 
 ## Running the Application
 
@@ -116,13 +157,25 @@ Or equivalently:
 python -m stemboost
 ```
 
-If installed via uv, from the `stemboost/` subdirectory:
+If installed via uv, from the project root:
 
 ```bash
 uv run python -m stemboost
 ```
 
-The application opens a 1000x700 Tkinter window. On the first run, the database is automatically created and populated with demo data.
+The application opens a 1000×700 Tkinter window. On the first run, the database is automatically created and populated with demo data. If piper-tts is the active backend, the voice model is downloaded at this point (requires an internet connection).
+
+## Running Tests
+
+```bash
+# uv
+uv run pytest
+
+# pip / standard
+pytest
+```
+
+Tests use an in-memory SQLite database and a `SpyTTS` test double — no audio hardware or network access is required.
 
 ## Demo Accounts
 
@@ -140,10 +193,16 @@ The seed data creates the following accounts (all with password `pass123`):
 
 ## Keyboard Navigation
 
-- **Tab** / **Shift+Tab** -- Move between interactive elements. All accessible widgets announce themselves via TTS on focus.
-- **Escape** -- Return to the login screen from any view.
-- **Enter** -- Submit the login form when the password field is focused.
+All interactive widgets announce themselves via TTS when focused.
+
+| Key | Action |
+|-----|--------|
+| **Tab** / **Shift+Tab** | Move between interactive elements |
+| **F1** | Announce current position and available navigation options |
+| **Space** | Activate the focused button |
+| **Enter** | Submit the login form (when password field is focused) |
+| **Escape** | Return to the login screen from any view |
 
 ## Resetting Data
 
-Click the "Reset Demo Data" button on the login screen to drop all tables, recreate them, and re-seed the demo data.
+Click the **Reset Demo Data** button on the login screen to drop all tables, recreate them, and re-seed the demo data.

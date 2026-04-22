@@ -1,1 +1,10 @@
-pyttsx3>=2.90
+# Core dependencies (piper-tts neural TTS backend)
+piper-tts>=1.4.2
+numpy>=2.2.6
+sounddevice>=0.5.5
+
+# Optional: pyttsx3 fallback TTS (used when piper-tts is unavailable)
+# pyttsx3>=2.90
+
+# Optional: test suite
+# pytest>=8.0
